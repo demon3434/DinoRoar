@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # DinoRoar 主后端服务
+  app:
+    image: crpi-tyyqcg8a2rpatesk.cn-shanghai.personal.cr.aliyuncs.com/zixidaxian/dinoroar-app:0.1
+    container_name: dinoroar-app
+    restart: unless-stopped
+    ports:
+      # 宿主机 HTTP & mDNS UDP 端口映射
+      - "${APP_HTTP_PORT:-8080}:8080"
+      - "${APP_UDP_PORT:-8090}:8090/udp"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - WEB_PORT=8080
+      - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
+      - STT_API_URL=http://stt:18000/api/transcribe
+      - UPLOAD_DIR=/workspace/uploads
+      - DATA_DIR=/workspace/data
+    volumes:
+      # 数据库与上传文件持久化挂载
+      - ${HOST_DATA_DIR:-/opt/docker/dinoroar/data}:/workspace/data
+      - ${HOST_UPLOADS_DIR:-/opt/docker/dinoroar/uploads}:/workspace/uploads
+      # 挂载宿主机时区文件，保证日志与日记时间一致
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - dinoroar_net
+
+  # DinoRoar STT 语音识别服务
+  stt:
+    image: crpi-tyyqcg8a2rpatesk.cn-shanghai.personal.cr.aliyuncs.com/zixidaxian/dinoroar-stt:0.1
+    container_name: dinoroar-stt
+    restart: unless-stopped
+    # 默认封闭 18000 对外端口，仅在 Docker 内部网络通信，提升安全性
+    # ports:
+    #   - "${STT_PORT:-18000}:18000"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      # 语音识别模型缓存挂载
+      - ${HOST_STT_MODELS_DIR:-/opt/docker/dinoroar/stt_models}:/app/models
+      # 挂载宿主机时区文件
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - dinoroar_net
+
+networks:
+  dinoroar_net:
+    name: dinoroar_net
+    driver: bridge

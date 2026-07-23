@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 查看日记{% endblock %}
+
+{% block content %}
+<!-- Logs filters container -->
+<div class="card" style="margin-bottom: 30px; padding: 20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleFiltersPanel()">
+        <h3 style="font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+            <span>🔍 心情时光穿梭机</span>
+            <span id="filtersActiveBadge" style="display:none; width:8px; height:8px; border-radius:50%; background:#ef4444;"></span>
+        </h3>
+        <span id="toggleFiltersIcon" style="transition: transform 0.3s; font-size:0.9rem;">▼</span>
+    </div>
+    
+    <div id="collapsibleFiltersContent" style="max-height: 500px; overflow: hidden; opacity: 1; transition: max-height 0.3s ease, opacity 0.3s ease; margin-top: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">关键字检索:</label>
+                <input type="text" id="keywordFilter" placeholder="搜索关键字..." style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">关系人物:</label>
+                <select id="personFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;"></select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">恐龙心情:</label>
+                <select id="moodFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+                    <option value="">全部心情</option>
+                    <option value="Triceratops">😊 快乐三角龙 (开心)</option>
+                    <option value="Pterodactyl_happy">🤩 冲天翼手龙 (兴奋)</option>
+                    <option value="T-Rex_proud">😎 挺胸霸王龙 (得意)</option>
+                    <option value="Brachiosaurus">🦕 大眼睛雷龙 (期待)</option>
+                    <option value="Stegosaurus">😮 呆呆剑龙 (惊讶)</option>
+                    <option value="Velociraptor">😐 佛系迅猛龙 (一般)</option>
+                    <option value="Ankylosaurus_scared">😰 缩壳甲龙 (紧张)</option>
+                    <option value="Pachycephalosaurus">🍃 叹气肿头龙 (遗憾)</option>
+                    <option value="Parasaurolophus_regret">😣 耷拉角副栉龙 (后悔)</option>
+                    <option value="Spinosaurus">😭 细雨棘龙 (伤心)</option>
+                    <option value="Dilophosaurus">😡 怒火双脊龙 (愤怒)</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">开始日期:</label>
+                <input type="date" id="startDateFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">结束日期:</label>
+                <input type="date" id="endDateFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+            </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:15px;">
+            <button onclick="clearFilters()" style="background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); font-size:0.8rem; padding: 6px 14px; border-radius:8px; cursor:pointer;">重置筛选</button>
+        </div>
+    </div>
+</div>
+
+<!-- Logs timeline container -->
+<div id="logsContainer" class="time-machine-container"></div>
+
+<!-- Pagination controls -->
+<div id="paginationContainer" style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:35px; margin-bottom:20px;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/diary.js?v=202607142306"></script>
+{% endblock %}

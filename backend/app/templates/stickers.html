@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 我的手账贴纸库{% endblock %}
+
+{% block head %}
+<style>
+    /* 容器布局：双栏响应式 Glassmorphism 布局 */
+    .stickers-layout {
+        display: flex;
+        gap: 25px;
+        max-width: 1200px;
+        margin: 0 auto;
+        min-height: calc(100vh - 120px);
+        align-items: stretch;
+    }
+    
+    /* 1. 左侧系列分类侧边栏 */
+    .series-sidebar {
+        width: 240px;
+        flex-shrink: 0;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 20px 15px;
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        min-height: calc(100vh - 75px);
+        max-height: calc(100vh - 75px);
+        position: sticky;
+        top: 25px;
+    }
+    
+    .sidebar-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-main);
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 5px;
+    }
+    
+    .series-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        flex: 1;
+    }
+    
+    .series-nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .series-nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border-color: var(--card-border);
+    }
+    
+    .series-nav-item.active {
+        background: var(--accent-sunny, #f59e0b);
+        color: #111;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    }
+    
+    .series-badge {
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        font-family: monospace;
+    }
+    
+    .series-nav-item.active .series-badge {
+        background: rgba(0, 0, 0, 0.15);
+        color: #111;
+    }
+    
+    /* 2. 右侧贴纸主展现区 */
+    .sticker-main-panel {
+        flex: 1;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 25px 30px;
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: calc(100vh - 75px);
+    }
+    
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--card-border);
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .panel-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+    }
+    
+    .panel-stats {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-weight: 700;
+    }
+    
+    /* Sticker Grid & Item styling (完全保持原有设计) */
+    .stickers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 25px;
+        margin-top: 10px;
+        flex: 1;
+    }
+    
+    .sticker-item {
+        position: relative;
+        border-radius: 18px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--card-border);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: default;
+        min-height: 190px;
+    }
+    .sticker-item:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(96, 165, 250, 0.35);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* 0 持有灰蒙蒙蒙层 (完全保持原样) */
+    .sticker-item.locked {
+        border-style: dashed;
+        opacity: 0.55;
+    }
+    .sticker-item.locked img {
+        filter: grayscale(100%);
+    }
+    
+    .sticker-img {
+        width: 90px;
+        height: 90px;
+        object-fit: contain;
+        margin-bottom: 12px;
+        transition: transform 0.3s ease;
+    }
+    .sticker-item:not(.locked):hover .sticker-img {
+        transform: scale(1.1);
+    }
+    
+    .sticker-name {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 4px;
+    }
+    .sticker-desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    
+    /* 圆形红底白色数字角标 (完全保持原样) */
+    .count-badge {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: linear-gradient(135deg, #f97316, #ef4444);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 800;
+        min-width: 24px;
+        height: 24px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+        border: 2px solid var(--bg-gradient);
+        animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn {
+        0% { transform: scale(0); }
+        100% { transform: scale(1); }
+    }
+
+    /* 规则底部提示卡 */
+    .rules-card {
+        margin-top: 30px;
+        background: rgba(255, 255, 255, 0.01);
+        border-left: 4px solid var(--accent-cloudy);
+        padding: 12px 18px;
+        border-radius: 0 12px 12px 0;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+        .stickers-layout {
+            flex-direction: column;
+        }
+        .series-sidebar {
+            width: 100%;
+            min-height: auto;
+            max-height: 180px;
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stickers-layout">
+    <!-- 1. 左侧系列分类侧边栏 -->
+    <div class="series-sidebar">
+        <div class="sidebar-title">
+            <span>📂</span> 贴纸系列
+        </div>
+        <div class="series-nav-list" id="seriesNavList">
+            <!-- JS 动态灌入分类选单页签 -->
+        </div>
+    </div>
+
+    <!-- 2. 右侧贴纸展现主面板 -->
+    <div class="sticker-main-panel">
+        <div class="panel-header">
+            <h2 class="panel-title" id="panelTitle">
+                <span>🎨</span> 全部已有贴纸
+            </h2>
+            <div class="panel-stats" id="panelStats">
+                已收集 0 款
+            </div>
+        </div>
+
+        <!-- 贴纸网格呈现区 -->
+        <div class="stickers-grid" id="stickersGrid">
+            <!-- JS 动态灌入所选系列下的贴纸 -->
+        </div>
+
+        <div class="rules-card">
+            <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">💡 提示：</strong>
+            未持有的贴纸呈灰度显示，可通过写日记赚取能量并在手机端孵化获得；贴进存盘日记后即留在该页悄悄话中哦！
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/stickers.js?v=202607211750"></script>
+{% endblock %}

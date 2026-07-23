@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 个人设置{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px;">
+    <!-- Theme selector card -->
+    <div class="card" style="padding: 25px;">
+        <div class="card-header-title" style="margin-bottom: 20px; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">🎨 主题外观设置</div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">选择你喜爱的恐龙秘密基地色彩风格：</p>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                <button class="logout-btn" onclick="changeTheme('dark-neon')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🌌 暗色霓虹</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('light-warm')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>☀️ 温暖浅沙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('nordic-cool')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>❄️ 极简冷灰</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('deep-forest')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🌲 深邃苍林</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('aurora-night')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>💚 极光幻夜</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('violet-dream')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>💜 罗兰紫幻</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('sakura-peach')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🌸 樱粉蜜桃</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('autumn-maple')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🍁 枫叶秋枫</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-pink')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🍑 粉桃马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-blue')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🌊 海盐马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-green')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🥑 开心果马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-yellow')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🍋 柠檬马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-purple')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🫐 蓝莓马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('macaron-orange')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🍊 甜橙马卡龙</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('dark-cyber')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>👾 赛博深色</span>
+                </button>
+                <button class="logout-btn" onclick="changeTheme('dark-obsidian')" style="height: 44px; text-align: left; padding: 0 12px; font-size: 0.85rem; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <span>🌑 曜石深色</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Change Password Card -->
+    <div class="card" style="padding: 25px;">
+        <div class="card-header-title" style="margin-bottom: 20px; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">🔑 修改登录密码</div>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">当前密码:</label>
+                <input type="password" id="currentPasswordInput" placeholder="输入现有密码..." style="padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">新密码:</label>
+                <input type="password" id="newPasswordInput" placeholder="设置新的密码..." style="padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">确认新密码:</label>
+                <input type="password" id="confirmPasswordInput" placeholder="再次输入新密码确认..." style="padding: 8px 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
+            </div>
+            <button onclick="handleChangePassword()" style="background: var(--success); color: white; border: none; height: 38px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; margin-top: 10px;">
+                保存修改密码
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/personal.js?v=202607142306"></script>
+{% endblock %}

@@ -1,0 +1,582 @@
+/* ==================== Admin Panel Custom Beautiful Controls ==================== */
+
+/* 1. Global Forms & Inputs */
+.form-group {
+    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.form-control {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 11px 15px;
+    color: var(--text-main);
+    outline: none;
+    font-size: 0.92rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.form-control:focus {
+    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
+}
+
+/* Input overrides for light themes */
+:root.theme-light-warm .form-control,
+:root.theme-nordic-cool .form-control,
+:root.theme-sakura-peach .form-control,
+:root.theme-autumn-maple .form-control,
+:root.theme-macaron-pink .form-control,
+:root.theme-macaron-blue .form-control,
+:root.theme-macaron-green .form-control,
+:root.theme-macaron-yellow .form-control,
+:root.theme-macaron-purple .form-control,
+:root.theme-macaron-orange .form-control {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: var(--text-main);
+}
+:root.theme-light-warm .form-control:focus,
+:root.theme-nordic-cool .form-control:focus,
+:root.theme-sakura-peach .form-control:focus,
+:root.theme-autumn-maple .form-control:focus,
+:root.theme-macaron-pink .form-control:focus,
+:root.theme-macaron-blue .form-control:focus,
+:root.theme-macaron-green .form-control:focus,
+:root.theme-macaron-yellow .form-control:focus,
+:root.theme-macaron-purple .form-control:focus,
+:root.theme-macaron-orange .form-control:focus {
+    background: rgba(0, 0, 0, 0.01);
+    border-color: var(--primary);
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.15);
+}
+
+/* Dropdown Selection (Select) overrides */
+select.form-control {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg fill='none' stroke='%23888888' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path d='M19 9l-7 7-7-7'></path></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    padding-right: 40px;
+    cursor: pointer;
+}
+
+select.form-control option {
+    background: #0d1b31;
+    color: #ffffff;
+}
+
+:root.theme-light-warm select.form-control option,
+:root.theme-nordic-cool select.form-control option,
+:root.theme-sakura-peach select.form-control option,
+:root.theme-autumn-maple select.form-control option,
+:root.theme-macaron-pink select.form-control option,
+:root.theme-macaron-blue select.form-control option,
+:root.theme-macaron-green select.form-control option,
+:root.theme-macaron-yellow select.form-control option,
+:root.theme-macaron-purple select.form-control option,
+:root.theme-macaron-orange select.form-control option {
+    background: #ffffff;
+    color: var(--text-main);
+}
+
+/* 2. Modern Table styling */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.user-table th {
+    padding: 16px 20px;
+    font-weight: 700;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--card-border);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.user-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.95rem;
+    vertical-align: middle;
+    color: var(--text-main);
+    transition: background 0.2s ease;
+}
+
+.user-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+:root.theme-light-warm .user-table tr:hover td,
+:root.theme-nordic-cool .user-table tr:hover td,
+:root.theme-sakura-peach .user-table tr:hover td,
+:root.theme-autumn-maple .user-table tr:hover td,
+:root.theme-macaron-pink .user-table tr:hover td,
+:root.theme-macaron-blue .user-table tr:hover td,
+:root.theme-macaron-green .user-table tr:hover td,
+:root.theme-macaron-yellow .user-table tr:hover td,
+:root.theme-macaron-purple .user-table tr:hover td,
+:root.theme-macaron-orange .user-table tr:hover td {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+:root.theme-light-warm .user-table td,
+:root.theme-nordic-cool .user-table td,
+:root.theme-sakura-peach .user-table td,
+:root.theme-autumn-maple .user-table td,
+:root.theme-macaron-pink .user-table td,
+:root.theme-macaron-blue .user-table td,
+:root.theme-macaron-green .user-table td,
+:root.theme-macaron-yellow .user-table td,
+:root.theme-macaron-purple .user-table td,
+:root.theme-macaron-orange .user-table td {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Action lists alignments */
+.action-links {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* 3. Reusable Buttons with modern styles */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn-primary-purple {
+    background: #8b5cf6 !important;
+    border: 1px solid #8b5cf6 !important;
+    color: white !important;
+}
+
+.btn-primary-purple:hover {
+    background: #a78bfa !important;
+    border-color: #a78bfa !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: var(--dino-red) !important;
+    border: 1px solid var(--dino-red) !important;
+    color: white !important;
+}
+
+.btn-danger:hover {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-primary-purple:active {
+    transform: translateY(0) scale(0.97);
+}
+
+/* Emoji action buttons for tables */
+.btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.btn-sm-primary {
+    background: rgba(139, 92, 246, 0.15) !important;
+    color: #c084fc !important;
+    border: 1px solid rgba(139, 92, 246, 0.25) !important;
+}
+
+.btn-sm-primary:hover {
+    background: #8b5cf6 !important;
+    color: white !important;
+    border-color: #8b5cf6 !important;
+    box-shadow: 0 4px 10px rgba(139, 92, 246, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-sm-warning {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(245, 158, 11, 0.25) !important;
+}
+
+.btn-sm-warning:hover {
+    background: #ea580c !important;
+    color: white !important;
+    border-color: #ea580c !important;
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-sm-danger {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(239, 68, 68, 0.25) !important;
+}
+
+.btn-sm-danger:hover {
+    background: var(--dino-red) !important;
+    color: white !important;
+    border-color: var(--dino-red) !important;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-sm:active {
+    transform: translateY(0) scale(0.95);
+}
+
+/* Light themes overrides for action buttons */
+:root.theme-light-warm .btn-sm,
+:root.theme-nordic-cool .btn-sm,
+:root.theme-sakura-peach .btn-sm,
+:root.theme-autumn-maple .btn-sm,
+:root.theme-macaron-pink .btn-sm,
+:root.theme-macaron-blue .btn-sm,
+:root.theme-macaron-green .btn-sm,
+:root.theme-macaron-yellow .btn-sm,
+:root.theme-macaron-purple .btn-sm,
+:root.theme-macaron-orange .btn-sm {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: var(--text-main);
+}
+
+:root.theme-light-warm .btn-sm-primary,
+:root.theme-nordic-cool .btn-sm-primary,
+:root.theme-sakura-peach .btn-sm-primary,
+:root.theme-autumn-maple .btn-sm-primary,
+:root.theme-macaron-pink .btn-sm-primary,
+:root.theme-macaron-blue .btn-sm-primary,
+:root.theme-macaron-green .btn-sm-primary,
+:root.theme-macaron-yellow .btn-sm-primary,
+:root.theme-macaron-purple .btn-sm-primary,
+:root.theme-macaron-orange .btn-sm-primary {
+    background: rgba(139, 92, 246, 0.08) !important;
+    color: #8b5cf6 !important;
+    border-color: rgba(139, 92, 246, 0.15) !important;
+}
+
+:root.theme-light-warm .btn-sm-warning,
+:root.theme-nordic-cool .btn-sm-warning,
+:root.theme-sakura-peach .btn-sm-warning,
+:root.theme-autumn-maple .btn-sm-warning,
+:root.theme-macaron-pink .btn-sm-warning,
+:root.theme-macaron-blue .btn-sm-warning,
+:root.theme-macaron-green .btn-sm-warning,
+:root.theme-macaron-yellow .btn-sm-warning,
+:root.theme-macaron-purple .btn-sm-warning,
+:root.theme-macaron-orange .btn-sm-warning {
+    background: rgba(245, 158, 11, 0.08) !important;
+    color: #d97706 !important;
+    border-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+:root.theme-light-warm .btn-sm-danger,
+:root.theme-nordic-cool .btn-sm-danger,
+:root.theme-sakura-peach .btn-sm-danger,
+:root.theme-autumn-maple .btn-sm-danger,
+:root.theme-macaron-pink .btn-sm-danger,
+:root.theme-macaron-blue .btn-sm-danger,
+:root.theme-macaron-green .btn-sm-danger,
+:root.theme-macaron-yellow .btn-sm-danger,
+:root.theme-macaron-purple .btn-sm-danger,
+:root.theme-macaron-orange .btn-sm-danger {
+    background: rgba(239, 68, 68, 0.08) !important;
+    color: var(--danger) !important;
+    border-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* 4. Elegant Modals with Glassmorphism overlay */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    width: 90%;
+    max-width: 460px;
+    border-radius: 24px;
+    padding: 30px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    color: var(--text-main);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    box-sizing: border-box;
+}
+
+.modal-header {
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-bottom: 22px;
+    color: var(--text-main);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 25px;
+}
+
+/* 5. Dinosaur Selector Controls & Image constraints */
+.dino-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-top: 15px;
+    margin-bottom: 20px;
+}
+
+.dino-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* IMPORTANT: constraints scale(3.12) */
+    position: relative;
+    aspect-ratio: 0.85;
+    box-sizing: border-box;
+}
+
+.dino-btn img {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+.dino-btn span {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.dino-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+/* Selected Sequence Preview slots */
+.dino-preview-seq {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    min-height: 70px;
+    align-items: center;
+}
+
+.dino-preview-item {
+    width: 60px;
+    height: 60px;
+    border: 2px dashed var(--card-border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: rgba(0, 0, 0, 0.15);
+    overflow: hidden; /* IMPORTANT: constraints scale(3.12) */
+}
+
+.dino-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dino-preview-item.filled {
+    border-style: solid;
+    border-color: var(--primary);
+}
+
+/* Theme button grid (replacement of select selector) */
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.theme-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    height: 44px;
+    padding: 0 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.theme-btn.active {
+    background: rgba(139, 92, 246, 0.15) !important;
+    border-color: #8b5cf6 !important;
+    color: #c084fc !important;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.2);
+}
+
+:root.theme-light-warm .theme-btn,
+:root.theme-nordic-cool .theme-btn,
+:root.theme-sakura-peach .theme-btn,
+:root.theme-autumn-maple .theme-btn,
+:root.theme-macaron-pink .theme-btn,
+:root.theme-macaron-blue .theme-btn,
+:root.theme-macaron-green .theme-btn,
+:root.theme-macaron-yellow .theme-btn,
+:root.theme-macaron-purple .theme-btn,
+:root.theme-macaron-orange .theme-btn {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+:root.theme-light-warm .theme-btn:hover,
+:root.theme-nordic-cool .theme-btn:hover,
+:root.theme-sakura-peach .theme-btn:hover,
+:root.theme-autumn-maple .theme-btn:hover,
+:root.theme-macaron-pink .theme-btn:hover,
+:root.theme-macaron-blue .theme-btn:hover,
+:root.theme-macaron-green .theme-btn:hover,
+:root.theme-macaron-yellow .theme-btn:hover,
+:root.theme-macaron-purple .theme-btn:hover,
+:root.theme-macaron-orange .theme-btn:hover {
+    background: rgba(0, 0, 0, 0.01);
+}
+/* 6. Toast Notification Bubble */
+.toast-notification {
+    position: fixed;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--primary);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    z-index: 9999;
+    box-shadow: 0 8px 30px rgba(139, 92, 246, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toast-notification.show {
+    top: 24px;
+}
+
+.toast-notification.success {
+    border-color: var(--dino-green) !important;
+    box-shadow: 0 8px 30px rgba(34, 197, 94, 0.35) !important;
+}
+
+.toast-notification.error {
+    border-color: var(--dino-red) !important;
+    box-shadow: 0 8px 30px rgba(239, 68, 68, 0.35) !important;
+}
+
+/* 7. Dinosaur image container to isolate scale transformation */
+.dino-img-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dino-img-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+}

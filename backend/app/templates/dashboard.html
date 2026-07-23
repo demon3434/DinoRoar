@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 秘密基地看板{% endblock %}
+
+{% block content %}
+<!-- 主看板 CSS Grid 2x2 跨行对齐网格 -->
+<div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 25px; margin-bottom: 25px;">
+    
+    <!-- 1. 板块 1: 🥚 蛋能量 (左上第1行，与时光机等宽) -->
+    <div class="card" style="grid-column: 1; grid-row: 1; padding: 22px; border: 1px solid var(--card-border); border-radius: 20px; position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 14px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                    <span>🥚 蛋能量</span>
+                </div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: #22c55e; font-family: monospace; background: rgba(34,197,94,0.12); padding: 4px 10px; border-radius: 10px; border: 1px solid rgba(34,197,94,0.25);">
+                    余额：<span id="eggEnergyBalance">0</span> ⚡
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="showEggEnergyHelp()" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-muted); border-radius: 50%; width: 30px; height: 30px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;" title="帮助说明">❓</button>
+                <a href="/stickers" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); text-decoration: none; padding: 5px 12px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; font-family: monospace; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); transition: transform 0.2s;">🛍️ 商店</a>
+            </div>
+        </div>
+
+        <!-- 蛋能量增量记录 2x2 网格 -->
+        <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); font-family: monospace; margin-bottom: 10px;">📈 增量记录：</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">今日</span>
+                <span id="deltaToday" style="font-size: 0.85rem; font-weight: bold; color: #3b82f6; font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">本周</span>
+                <span id="deltaThisWeek" style="font-size: 0.85rem; font-weight: bold; color: #f59e0b; font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">上周</span>
+                <span id="deltaLastWeek" style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">本月</span>
+                <span id="deltaThisMonth" style="font-size: 0.85rem; font-weight: bold; color: #22c55e; font-family: monospace;">+0 ⚡</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 板块 2: 📊 时光机 (左下第2行，与蛋能量等宽) -->
+    <div class="card" style="grid-column: 1; grid-row: 2; padding: 22px; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; border-radius: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                <span>📊 时光机</span>
+            </div>
+            <!-- Toggle Tabs -->
+            <div style="display: flex; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 3px; gap: 3px;">
+                <button onclick="switchPeriodTab('week')" id="pTab-week" class="period-tab-btn active-tab" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本周</button>
+                <button onclick="switchPeriodTab('month')" id="pTab-month" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本月</button>
+                <button onclick="switchPeriodTab('last_month')" id="pTab-last_month" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">上月</button>
+                <button onclick="switchPeriodTab('year')" id="pTab-year" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本年</button>
+            </div>
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;" id="periodDateRange">
+            📅 周期范围: ----.--.-- - ----.--.--
+        </div>
+
+        <!-- 篇数及增减统计 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); border: 1px solid var(--card-border); padding: 12px 16px; border-radius: 14px;">
+            <span style="font-weight: 800; font-size: 0.85rem; color: var(--text-main); font-family: monospace;">📝 新增悄悄话</span>
+            <div style="display: flex; align-items: center; gap: 8px; font-family: monospace;">
+                <span id="periodLogCount" style="font-size: 1.15rem; font-weight: 800; color: #22c55e;">0 篇</span>
+                <span id="periodLogDiff" style="font-size: 0.75rem; color: var(--text-muted);">(持平)</span>
+            </div>
+        </div>
+
+        <!-- 情绪分布比例进度条 -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); font-family: monospace;">🎨 情绪占比晴雨表</div>
+            <div style="width: 100%; height: 16px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--card-border); overflow: hidden; display: flex;" id="periodMoodProgress">
+                <div id="moodBarHigh" style="width: 0%; background: #22c55e; height: 100%; transition: width 0.3s;" title="开心"></div>
+                <div id="moodBarMid" style="width: 0%; background: #3b82f6; height: 100%; transition: width 0.3s;" title="平静"></div>
+                <div id="moodBarLow" style="width: 0%; background: #ef4444; height: 100%; transition: width 0.3s;" title="难过"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-family: monospace; margin-top: 2px;">
+                <span>🟢 开心 <strong id="pctHigh">0%</strong></span>
+                <span>🔵 平静 <strong id="pctMid">0%</strong></span>
+                <span>🔴 难过 <strong id="pctLow">0%</strong></span>
+            </div>
+        </div>
+
+        <!-- 最常提及的小伙伴 Top 3 -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); font-family: monospace;">👥 提到最多的小伙伴</div>
+            <div id="periodTopPersonsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; min-height: 80px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 板块 3: 👥 日记中的 ta (右侧第2列，跨越第1到第2行：1 / span 2，顶部绝对平齐蛋能量，底部绝对平齐时光机) -->
+    <div class="card" style="grid-column: 2; grid-row: 1 / span 2; padding: 22px; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; border-radius: 20px; height: 100%; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                <span>👥 日记中的 ta</span>
+            </div>
+        </div>
+
+        <!-- 分类 Tab 页签滑动/切换栏 -->
+        <div id="categoryTabsContainer" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin;">
+        </div>
+
+        <!-- 选中分类下的关系人列表卡片容器 -->
+        <div id="categoryPersonsContainer" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: hidden; padding-right: 6px; scrollbar-width: thin;">
+        </div>
+    </div>
+
+</div>
+
+<!-- 蛋能量说明书 Modal -->
+<div id="eggEnergyHelpModal" class="modal" onclick="if(event.target === this) this.style.display='none';" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:9999; backdrop-filter:blur(5px);">
+    <div style="background: var(--bg-card, var(--card-bg, #1e293b)); border: 1px solid var(--card-border); border-radius: 20px; width: 90%; max-width: 440px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); font-family: monospace; color: var(--text-main);">
+        <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <span>🥚 蛋能量说明书</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.7; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+                <strong style="color: #f59e0b;">⭐ 什么是蛋能量？</strong><br>
+                蛋能量是小朋友记录日记赚取的神奇积分奖励哦！
+            </div>
+            <div>
+                <strong style="color: #22c55e;">⭐ 怎么获得蛋能量？</strong><br>
+                • ✍️ 记一篇纯文字悄悄话，获得 <strong>10 蛋能量</strong><br>
+                • 🖼️ 记一篇包含图片/视频/录音的悄悄话，获得 <strong>30 蛋能量！</strong>
+            </div>
+            <div>
+                <strong style="color: #3b82f6;">⭐ 怎么使用蛋能量？</strong><br>
+                • 🛍️ 点击顶部的“贴纸商店”按钮，挑选并兑换精美的恐龙贴纸<br>
+                • 🎨 兑换后的贴纸可直接用于日记排版哦！
+            </div>
+        </div>
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+            <button onclick="document.getElementById('eggEnergyHelpModal').style.display='none';" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); border: none; padding: 8px 20px; border-radius: 10px; font-weight: bold; cursor: pointer;">我知道啦</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/overview.js?v=202607211645"></script>
+{% endblock %}

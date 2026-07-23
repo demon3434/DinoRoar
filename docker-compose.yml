@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: dinoroar-app:latest
+    container_name: dinoroar-app
+    restart: unless-stopped
+    ports:
+      # Exposes the configured host port mapping (defaults to 8080)
+      - "${WEB_PORT:-8080}:8080"
+      - "8090:8090/udp"
+    environment:
+      - WEB_PORT=${WEB_PORT:-8080}
+      - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
+      - STT_API_URL=http://stt:18000/api/transcribe
+      - UPLOAD_DIR=/workspace/uploads
+      - DATA_DIR=/workspace/data
+    volumes:
+      # Persists DB in data volume and media uploads in uploads volume
+      - /opt/docker/dinoroar/data:/workspace/data
+      - /opt/docker/dinoroar/uploads:/workspace/uploads
+    networks:
+      - dinoroar_net
+
+  stt:
+    build:
+      context: ./stt
+      dockerfile: Dockerfile
+    image: dinoroar-stt:latest
+    container_name: dinoroar-stt
+    restart: unless-stopped
+    # ports:
+    #   - "18000:18000"
+
+
+
+    volumes:
+      # Caches ONNX models to avoid redownloading on container recreation
+      - ./stt/models:/app/models
+    networks:
+      - dinoroar_net
+
+networks:
+  dinoroar_net:
+    name: dinoroar_net
+    driver: bridge
