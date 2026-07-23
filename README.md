@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="backend/app/static/images/default_stickers/sticker_3d_triceratops.png" width="128" height="128" alt="DinoRoar Icon">
+</p>
+
 # 🦖 DinoRoar - 恐龙手账后端与 Web 管理平台
 
 DinoRoar 是专为亲子与手账爱好者打造的心情日记与手账贴纸系统后端。项目基于 FastAPI 开发，内置 SenseVoice 语音识别引擎（STT）代理与 mDNS 局域网设备自动发现功能。
@@ -41,8 +45,6 @@ docker compose --env-file .env -f docker-compose.aliyun.yml up -d
 
 部署完成后，访问 `http://<服务器IP>:8080` 即可进入 Web 管理控制台（默认管理员：`admin` / `admin_123`）。
 
-> 详细的部署说明与运维指南请参阅：[阿里云镜像快捷部署指南](docs/aliyun_docker_deploy_guide.md)
-
 ---
 
 ## 📁 目录结构
@@ -56,13 +58,6 @@ DinoRoar/
 ├── stt/                      # SenseVoice 语音识别服务
 │   ├── main.py               # STT API 服务入口
 │   └── Dockerfile            # STT 容器构建文件
-├── docs/                     # 部署与系统设计规范文档
 ├── docker-compose.aliyun.yml # 阿里云镜像开箱即用编排文件
 └── docker-compose.yml        # 本地源码构建编排文件
 ```
-
----
-
-## 📄 开源协议与约定
-
-本项目遵循团队内部协同开发规范，接口与 Android 端数据一致性约束参见 [AGENTS.md](AGENTS.md)。

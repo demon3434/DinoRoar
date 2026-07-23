@@ -2,16 +2,8 @@
 # DinoRoar Web & Backend - Git Ignore Specification
 # ===================================================================
 
-# 1. 个人服务器与敏感账号文档 (Personal Server & Account Info)
-docs/server_info.md
-docs/compile_env.md
-docs/*secret*
-docs/*password*
-
-# 2. 开发过程中的记录存档、历史备份与临时数据 (Archive & Temp Data)
-docs/*经验总结*
-docs/*总结*.md
-docs/仙剑粘土人贴纸/
+# 1. 内部文档与设计规范 (Documentation & Private Internal Specs)
+docs/
 /1001
 /logo
 *.bak
@@ -23,6 +15,10 @@ docs/仙剑粘土人贴纸/
 *.diff
 
 # 3. 开发中的工具脚本与辅助文件 (Development Tools & Utility Scripts)
+/*.py
+/*.sh
+/*.ps1
+/*.bat
 deploy.py
 deploy.ps1
 deploy.bat
