@@ -473,6 +473,10 @@ from starlette.requests import Request as StarletteRequest
 class Utf8CharsetMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
         response = await call_next(request)
+        if request.url.path.startswith("/static/js/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         ct = response.headers.get("content-type", "")
         if ct and "charset" not in ct and (
             "text/" in ct or "application/json" in ct or "application/javascript" in ct

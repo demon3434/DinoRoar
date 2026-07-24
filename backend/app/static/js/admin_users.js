@@ -1,8 +1,12 @@
-// 1. Fetch & Render users
 async function fetchUsers() {
     try {
-        const res = await fetch('/api/admin/users', {
-            headers: { 'Authorization': 'Bearer ' + token }
+        const res = await fetch('/api/admin/users?_t=' + Date.now(), {
+            headers: { 
+                'Authorization': 'Bearer ' + token,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
         });
         if (res.ok) {
             const users = await res.json();
@@ -39,7 +43,7 @@ function renderUsers(users) {
             <td style="font-size: 0.88rem; font-weight: 700; color: var(--text-muted);">${user.id}</td>
             <td style="font-weight:600;">${user.username}${pendingBadge}${statusBadge}</td>
             <td>${user.nickname || '<span style="color:var(--text-muted);">未设置</span>'}</td>
-            <td><button class="btn-sm btn-sm-primary" onclick="viewUserLockSequence(${user.id}, '${user.username}', '${user.lock_pattern}')" title="查看解锁码序列">👁️ 查看</button></td>
+            <td><button class="btn-sm btn-sm-primary" onclick="viewUserLockSequence(${user.id}, '${user.username}')" title="查看最新解锁码序列">👁️ 查看</button></td>
             <td>
                 <div class="action-links">
                     <button class="btn-sm btn-sm-primary" onclick="openEditUserModal(${user.id}, '${user.username}', '${user.nickname || ''}')" title="修改账户用户名与昵称">✏️</button>
@@ -100,7 +104,7 @@ async function handleAddUser() {
             showToast("创建失败: " + err.detail, "error");
         }
     } catch(e) {
-        showToast("网络链接失败，请稍后重试", "error");
+        showToast("网络请求失败", "error");
     }
 }
 
@@ -168,8 +172,30 @@ function closeResetLockModal() {
     clearDinoSequence();
 }
 
-function viewUserLockSequence(id, username, lockPattern) {
+async function viewUserLockSequence(id, username) {
     document.getElementById('viewLockSeqTargetName').innerText = username;
+    
+    // 实时拉取最新用户列表获取最新数据库中 lock_pattern
+    let lockPattern = "1,2,3";
+    try {
+        const res = await fetch('/api/admin/users?_t=' + Date.now(), {
+            headers: { 
+                'Authorization': 'Bearer ' + token,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            },
+            cache: 'no-store'
+        });
+        if (res.ok) {
+            const users = await res.json();
+            const targetUser = users.find(u => u.id === id);
+            if (targetUser && targetUser.lock_pattern) {
+                lockPattern = targetUser.lock_pattern;
+            }
+        }
+    } catch(e) {
+        console.error("Failed to fetch fresh user lock pattern", e);
+    }
     
     const parts = lockPattern.split(',');
     for (let i = 0; i < 3; i++) {
@@ -410,7 +436,12 @@ window.addEventListener('click', function(e) {
     }
 });
 
-// Start rendering on window load
+// Clean event-driven rendering (0 background polling overhead)
 document.addEventListener("DOMContentLoaded", () => {
+    fetchUsers();
+});
+
+// Refresh list on window focus only when user switches back to the tab
+window.addEventListener("focus", () => {
     fetchUsers();
 });
