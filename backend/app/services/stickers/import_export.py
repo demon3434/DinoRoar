@@ -212,14 +212,20 @@ def confirm_import_stickers(
     读取解压缓存中的贴纸包，根据管理员的选择以及冲突策略将贴纸系列落库，
     并将贴纸图片落盘写入层级目录 backend/app/static/uploads/stickers/series_{series_id}/
     """
+    import logging
+    logger = logging.getLogger("DinoRoar")
+    logger.info(f"confirm_import_stickers triggered: temp_token={temp_token}, selected_series_names={selected_series_names}, conflict_resolution={conflict_resolution}")
+
     target_dir = TEMP_IMPORT_DIR / temp_token
     if not target_dir.exists():
+        logger.error(f"confirm_import_stickers failed: target_dir={target_dir} not exists")
         raise ValueError("导入缓存已过期或不存在，请重新上传贴纸包")
 
     try:
         existing_series_map = {
             s.name: s.id for s in db.query(StickerSeries).filter(StickerSeries.is_deleted == False).all()
         }
+        logger.info(f"confirm_import_stickers: existing_series_map={existing_series_map}")
 
         imported_count = 0
 
@@ -229,11 +235,14 @@ def confirm_import_stickers(
                 try:
                     with open(series_json_file, "r", encoding="utf-8") as sf:
                         s_data = json.load(sf)
-                except Exception:
+                except Exception as e:
+                    logger.error(f"confirm_import_stickers: failed to parse series.json: {str(e)}")
                     continue
 
                 raw_name = s_data.get("series_name", "未命名系列")
+                logger.info(f"confirm_import_stickers: found series in pack raw_name='{raw_name}'")
                 if raw_name not in selected_series_names:
+                    logger.info(f"confirm_import_stickers: raw_name='{raw_name}' not in selected_series_names, skipping")
                     continue
 
                 final_series_name = raw_name
@@ -241,14 +250,17 @@ def confirm_import_stickers(
 
                 if raw_name in existing_series_map:
                     if conflict_resolution == "skip":
+                        logger.info(f"confirm_import_stickers: raw_name='{raw_name}' exists and conflict_resolution='skip', skipping whole series")
                         continue
                     elif conflict_resolution == "merge":
                         series_id = existing_series_map[raw_name]
+                        logger.info(f"confirm_import_stickers: raw_name='{raw_name}' exists and conflict_resolution='merge', merging into series_id={series_id}")
                     elif conflict_resolution == "rename":
                         idx = 1
                         while f"{raw_name}_{idx}" in existing_series_map:
                             idx += 1
                         final_series_name = f"{raw_name}_{idx}"
+                        logger.info(f"confirm_import_stickers: raw_name='{raw_name}' exists and conflict_resolution='rename', renaming to '{final_series_name}'")
 
                 if series_id is None:
                     new_series = StickerSeries(
@@ -264,6 +276,15 @@ def confirm_import_stickers(
 
                 stickers_raw = s_data.get("stickers", [])
                 for st in stickers_raw:
+                    st_name = st.get("name", "贴纸")[:6]
+                    
+                    # 查找该系列下是否已存在同名且非软删除的贴纸
+                    existing_sticker = db.query(StickerConfig).filter(
+                        StickerConfig.series_id == series_id,
+                        StickerConfig.name == st_name,
+                        StickerConfig.is_deleted == False
+                    ).first()
+
                     img_file = st.get("image_file", "")
                     src_img_path = Path(root) / img_file
 
@@ -275,17 +296,49 @@ def confirm_import_stickers(
                         shutil.copy(src_img_path, dest_path)
                         final_image_url = f"/static/uploads/stickers/series_{series_id}/{dest_file_name}"
 
-                    sticker_cfg = StickerConfig(
-                        series_id=series_id,
-                        name=st.get("name", "贴纸")[:6],
-                        image_url=final_image_url,
-                        description=st.get("description"),
-                        sort_order=st.get("sort_order", 0),
-                        exchange_price=st.get("exchange_price", 20),
-                        is_active=True
-                    )
-                    db.add(sticker_cfg)
-                    db.flush()
+                    if existing_sticker:
+                        # 覆盖替换已有贴纸配置
+                        logger.info(f"confirm_import_stickers: sticker name='{st_name}' exists (ID={existing_sticker.id}), updating...")
+                        if final_image_url:
+                            # 物理删除原贴纸绑定的图片，避免磁盘空间残留
+                            if existing_sticker.image_url:
+                                filename = os.path.basename(existing_sticker.image_url)
+                                # 优先尝试从本系列上传子目录下定位
+                                old_img_path = get_series_upload_dir(existing_sticker.series_id) / filename
+                                if not old_img_path.exists():
+                                    # 兼容兜底：平铺根目录
+                                    old_img_path = STICKERS_UPLOAD_DIR / filename
+                                
+                                if old_img_path.exists():
+                                    try:
+                                        os.remove(old_img_path)
+                                        logger.info(f"confirm_import_stickers: old physical image deleted: {old_img_path}")
+                                    except Exception as ex:
+                                        logger.error(f"confirm_import_stickers: failed to delete old physical image {old_img_path}: {str(ex)}")
+                            existing_sticker.image_url = final_image_url
+                            logger.info(f"confirm_import_stickers: updated image_url to {final_image_url}")
+                        
+                        if st.get("description") is not None:
+                            existing_sticker.description = st.get("description")
+                        # 🚨 排序（sort_order）不再被导入覆盖更新，保留本系列下原有的展示排序值，避免冲突
+                        if st.get("exchange_price") is not None:
+                            existing_sticker.exchange_price = st.get("exchange_price", 20)
+                        db.flush()
+                    else:
+                        # 创建全新贴纸配置
+                        logger.info(f"confirm_import_stickers: sticker name='{st_name}' is new, inserting...")
+                        sticker_cfg = StickerConfig(
+                            series_id=series_id,
+                            name=st_name,
+                            image_url=final_image_url,
+                            description=st.get("description"),
+                            sort_order=st.get("sort_order", 0),
+                            exchange_price=st.get("exchange_price", 20),
+                            is_active=True
+                        )
+                        db.add(sticker_cfg)
+                        db.flush()
+                        logger.info(f"confirm_import_stickers: inserted new sticker id={sticker_cfg.id}")
 
                 imported_count += 1
 

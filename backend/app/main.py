@@ -76,8 +76,21 @@ async def lifespan(app: FastAPI):
             # Seed DinoConfigs if empty
             seed_initial_dino_configs(db)
             
-            # Migration check: Add nickname column if missing
+            # Migration check: Create indexes if missing
             from sqlalchemy import text
+            try:
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_logs_user_deleted_incident ON logs(user_id, is_deleted, incident_date)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_persons_user_deleted ON persons(user_id, is_deleted)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_categories_user_deleted ON person_categories(user_id, is_deleted)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_attachments_log_id ON attachments(log_id)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_log_person_association_person_uuid ON log_person_association(person_uuid)"))
+                db.commit()
+                logger.info("Database Migration: Indexes verified/created successfully.")
+            except Exception as idx_err:
+                db.rollback()
+                logger.error(f"Database Migration: Failed to create indexes: {idx_err}")
+
+            # Migration check: Add nickname column if missing
             try:
                 db.execute(text("SELECT nickname FROM users LIMIT 1"))
             except Exception:

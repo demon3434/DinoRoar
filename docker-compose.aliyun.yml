@@ -23,6 +23,11 @@ services:
       - ${HOST_UPLOADS_DIR:-/opt/docker/dinoroar/uploads}:/workspace/uploads
       # 挂载宿主机时区文件，保证日志与日记时间一致
       - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
 
@@ -41,6 +46,11 @@ services:
       - ${HOST_STT_MODELS_DIR:-/opt/docker/dinoroar/stt_models}:/app/models
       # 挂载宿主机时区文件
       - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
 

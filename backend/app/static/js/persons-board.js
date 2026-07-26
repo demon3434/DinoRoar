@@ -67,7 +67,7 @@ function renderPersonBoard() {
 
     // Group persons by category_uuid
     const groups = {};
-    globalPersons.filter(p => !p.is_deleted).forEach(p => {
+    globalPersons.forEach(p => {
         const key = p.category_uuid || 'unclassified';
         if (!groups[key]) groups[key] = [];
         groups[key].push(p);
@@ -85,10 +85,7 @@ function renderPersonBoard() {
         container.appendChild(col);
     });
 
-    // 2. Render Unclassified column (Static)
-    const unclassifiedPersons = groups['unclassified'] || [];
-    const unclassifiedCol = createColumnDOM({ uuid: 'unclassified', name: '未分类' }, unclassifiedPersons.filter(p => !p.is_temporary), -1, 0);
-    container.appendChild(unclassifiedCol);
+
 
     // 3. Render Temporary Persons column (Static)
     const temporaryPersons = globalPersons.filter(p => p.is_temporary && !p.is_deleted);
@@ -97,12 +94,39 @@ function renderPersonBoard() {
         container.appendChild(tempCol);
     }
 
-    // 4. Render Disabled Archive column (Static)
-    const disabledPersons = globalPersons.filter(p => p.is_deleted);
+    // 4. Render Disabled Archive area (Separated Columns Container)
     const disabledCategories = globalCategories.filter(c => c.is_deleted);
-    if (disabledPersons.length > 0 || disabledCategories.length > 0) {
-        const archiveCol = createArchiveColumnDOM(disabledCategories, disabledPersons);
-        container.appendChild(archiveCol);
+    
+    if (disabledCategories.length > 0) {
+        let archiveContainer = document.getElementById('archiveContainer');
+        if (!archiveContainer) {
+            archiveContainer = document.createElement('div');
+            archiveContainer.id = 'archiveContainer';
+            archiveContainer.style.cssText = 'margin-top: 40px; border-top: 1px dashed rgba(128,128,128,0.2); padding-top: 20px;';
+            container.parentNode.appendChild(archiveContainer);
+        }
+        
+        archiveContainer.innerHTML = `
+            <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                📁 已停用的分类 (${disabledCategories.length})
+            </div>
+            <div class="kanban-board" style="min-height: auto; padding-bottom: 10px;">
+            </div>
+        `;
+        
+        const archiveBoard = archiveContainer.querySelector('.kanban-board');
+        
+        // Render each disabled category
+        disabledCategories.forEach(cat => {
+            const colPersons = groups[cat.uuid] || [];
+            const col = createDisabledColumnDOM(cat, colPersons.filter(p => !p.is_temporary));
+            archiveBoard.appendChild(col);
+        });
+    } else {
+        const archiveContainer = document.getElementById('archiveContainer');
+        if (archiveContainer) {
+            archiveContainer.remove();
+        }
     }
 
     // Setup HTML5 Drag and Drop events
@@ -128,10 +152,18 @@ function createColumnDOM(cat, persons, index, totalCols) {
     
     let actionHtml = '';
     if (isCustom) {
+        const isFirst = index === 0;
+        const isLast = index === totalCols - 1;
+        
+        const upBtn = `<span onclick="moveCategoryUp(${index})" style="cursor:${isFirst ? 'default' : 'pointer'}; opacity:${isFirst ? 0.3 : 1}; font-size:0.75rem;" title="上移分类"><svg viewBox="0 0 24 24" width="14" height="14" style="fill:none; stroke:var(--text-muted); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; display:inline-block; vertical-align:middle;"><path d="m18 15-6-6-6 6"/></svg></span>`;
+        const downBtn = `<span onclick="moveCategoryDown(${index})" style="cursor:${isLast ? 'default' : 'pointer'}; opacity:${isLast ? 0.3 : 1}; font-size:0.75rem;" title="下移分类"><svg viewBox="0 0 24 24" width="14" height="14" style="fill:none; stroke:var(--text-muted); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; display:inline-block; vertical-align:middle;"><path d="m6 9 6 6 6-6"/></svg></span>`;
+        
         actionHtml = `
-            <div style="display:flex; gap:6px;">
-                <span onclick="openEditCategoryModal('${cat.uuid}', '${cat.name}')" style="cursor:pointer; font-size:0.75rem;">✏️</span>
-                <span onclick="deleteCategory('${cat.uuid}')" style="cursor:pointer; font-size:0.75rem;">🗑️</span>
+            <div style="display:flex; gap:8px; align-items:center;">
+                ${upBtn}
+                ${downBtn}
+                <span onclick="openEditCategoryModal('${cat.uuid}', '${cat.name}')" style="cursor:pointer; font-size:0.75rem;" title="修改分类名称">✏️</span>
+                <span onclick="deleteCategory('${cat.uuid}')" style="cursor:pointer; font-size:0.75rem;" title="停用该分类">🚫</span>
             </div>
         `;
     }
@@ -166,16 +198,38 @@ function createColumnDOM(cat, persons, index, totalCols) {
             openEditPersonModal(p);
         };
 
+        if (p.is_deleted) {
+            card.style.opacity = '0.55';
+            card.style.filter = 'grayscale(50%)';
+            card.style.border = '1px dashed rgba(128, 128, 128, 0.4)';
+        }
+
         const relLabel = p.relationship ? `<span style="font-size:0.7rem; font-weight:600; opacity:0.8; margin-left:6px;">(${p.relationship})</span>` : '';
         const abbrLabel = p.abbreviation ? `<div style="font-size:0.75rem; opacity:0.7; margin-top:4px; font-family:monospace;">缩写: ${p.abbreviation}</div>` : '';
         const tempTag = p.is_temporary ? `<span style="font-size:0.65rem; background:rgba(0,0,0,0.25); padding:1px 4px; border-radius:4px; margin-left:6px; color:#f8fafc;">路人</span>` : '';
+        const disabledTag = p.is_deleted ? `<span style="font-size:0.65rem; background:rgba(128,128,128,0.3); padding:1px 4px; border-radius:4px; margin-left:6px; color:var(--text-muted);">已停用</span>` : '';
         
         const colorDot = p.is_temporary ? '' : `<span class="dino-color-dot dot-${p.color_tag || 'red'}" style="margin-left:6px; display:inline-block; vertical-align:middle;"></span>`;
+        
+        let actionBtn = '';
+        if (!p.is_temporary) {
+            if (p.is_deleted) {
+                actionBtn = `<span onclick="enablePersonDirect('${p.uuid}', event)" style="cursor:pointer; padding: 2px 6px; display:inline-flex; align-items:center;" title="恢复启用该人物"><svg viewBox="0 0 24 24" width="14" height="14" style="fill:none; stroke:#10b981; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-2.79"/></svg></span>`;
+            } else {
+                actionBtn = `<span onclick="deletePersonDirect('${p.uuid}', event)" style="cursor:pointer; font-size:0.85rem; padding: 2px 6px; color: #ef4444;" title="停用该人物">🚫</span>`;
+            }
+        }
+
         card.innerHTML = `
-            <div style="font-weight:700; font-size:0.85rem; display:flex; align-items:center; justify-content:space-between;">
-                <span>${p.name}${relLabel}${colorDot}${tempTag}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <div style="flex:1;">
+                    <div style="font-weight:700; font-size:0.85rem; display:flex; align-items:center;">
+                        <span>${p.name}${relLabel}${colorDot}${tempTag}${disabledTag}</span>
+                    </div>
+                    ${abbrLabel}
+                </div>
+                ${actionBtn}
             </div>
-            ${abbrLabel}
         `;
         cardsContainer.appendChild(card);
     });
@@ -231,71 +285,100 @@ async function syncPersonsBatch(personsList) {
 }
 
 // Modal triggers
-function createArchiveColumnDOM(categories, persons) {
+function createDisabledColumnDOM(cat, persons) {
     const col = document.createElement('div');
     col.className = 'kanban-column';
-    col.style.background = 'rgba(239, 68, 68, 0.05)';
-    col.style.border = '1px dashed rgba(239, 68, 68, 0.2)';
+    col.style.background = 'rgba(128, 128, 128, 0.05)';
+    col.style.border = '1px dashed rgba(128, 128, 128, 0.3)';
+    col.style.opacity = '0.85';
     
-    col.innerHTML = `
-        <div class="kanban-column-header" style="border-bottom: 2px solid rgba(239, 68, 68, 0.2);">
-            <div style="font-weight: bold; color: #ef4444;">📁 已停用的归档区 (${categories.length + persons.length})</div>
+    const header = document.createElement('div');
+    header.className = 'kanban-column-header';
+    header.style.borderBottom = '2px solid rgba(128, 128, 128, 0.2)';
+    header.innerHTML = `
+        <div class="kanban-column-title" style="color: var(--text-muted); font-weight: bold;">
+            <span style="color: var(--text-muted);">📂 ${cat.name}</span>
+            <span style="font-size:0.75rem; color:var(--text-muted);">(${persons.length})</span>
         </div>
-        <div class="kanban-cards-container" style="display:flex; flex-direction:column; gap:8px; padding: 12px 4px; overflow-y:auto; max-height:480px;">
-        </div>
+        <span onclick="enableCategory('${cat.uuid}')" style="cursor:pointer; padding: 4px; display:inline-flex; align-items:center;" title="恢复启用该分类"><svg viewBox="0 0 24 24" width="15" height="15" style="fill:none; stroke:#10b981; stroke-width:3; stroke-linecap:round; stroke-linejoin:round;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-2.79"/></svg></span>
     `;
+    col.appendChild(header);
     
-    const cardsContainer = col.querySelector('.kanban-cards-container');
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'kanban-cards-container';
     
-    if (categories.length > 0) {
-        const catTitle = document.createElement('div');
-        catTitle.style.cssText = 'font-size:0.75rem; color:var(--text-muted); font-weight:bold; margin-top:4px;';
-        catTitle.textContent = '停用的分类：';
-        cardsContainer.appendChild(catTitle);
-        
-        categories.forEach(cat => {
-            const card = document.createElement('div');
-            card.className = 'kanban-card';
-            card.style.cssText = 'padding:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7);';
-            card.innerHTML = `
-                <div style="font-weight:500; font-size:0.85rem;">📂 ${cat.name}</div>
-                <button onclick="enableCategory('${cat.uuid}')" class="btn-primary-purple" style="padding:4px 8px; font-size:0.7rem; border-radius:6px; cursor:pointer;">启用</button>
-            `;
-            cardsContainer.appendChild(card);
-        });
+    persons.forEach(p => {
+        const card = document.createElement('div');
+        card.className = `kanban-card person-card color-chip-${p.color_tag || 'red'}`;
+        card.style.cursor = 'default';
+        if (p.is_deleted) {
+            card.style.opacity = '0.55';
+            card.style.filter = 'grayscale(50%)';
+        }
+        const colorDot = p.is_temporary ? '' : `<span class="dino-color-dot dot-${p.color_tag || 'red'}" style="margin-left:6px; display:inline-block; vertical-align:middle;"></span>`;
+        const disabledTag = p.is_deleted ? `<span style="font-size:0.65rem; background:rgba(128,128,128,0.3); padding:1px 4px; border-radius:4px; margin-left:6px; color:var(--text-muted);">已停用</span>` : '';
+        card.innerHTML = `
+            <div style="font-weight:700; font-size:0.85rem;">
+                <span>${p.name} ${p.relationship ? `<span style="font-size:0.7rem; opacity:0.8;">(${p.relationship})</span>` : ''}${colorDot}${disabledTag}</span>
+            </div>
+        `;
+        cardsContainer.appendChild(card);
+    });
+    
+    if (persons.length === 0) {
+        const placeholder = document.createElement('div');
+        placeholder.style = "border: 1px dashed rgba(128,128,128,0.15); border-radius:10px; padding:15px; text-align:center; font-size:0.75rem; color:var(--text-muted);";
+        placeholder.textContent = "无活跃成员";
+        cardsContainer.appendChild(placeholder);
     }
     
-    if (persons.length > 0) {
-        const personTitle = document.createElement('div');
-        personTitle.style.cssText = 'font-size:0.75rem; color:var(--text-muted); font-weight:bold; margin-top:8px;';
-        personTitle.textContent = '停用的关系人：';
-        cardsContainer.appendChild(personTitle);
-        
-        persons.forEach(p => {
-            const card = document.createElement('div');
-            card.className = 'kanban-card';
-            card.style.cssText = 'padding:10px; display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.7); cursor:pointer;';
-            card.onclick = function(e) {
-                if (e.target.tagName !== 'BUTTON') {
-                    openEditPersonModal(p);
-                }
-            };
-            
-            const colorClass = p.color_tag || 'red';
-            card.innerHTML = `
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <div class="dino-color-dot dino-color-dot-${colorClass}"></div>
-                    <div style="font-weight:bold; font-size:0.85rem;">${p.name}</div>
-                    ${p.relationship ? `<div style="font-size:0.7rem; color:var(--text-muted);">(${p.relationship})</div>` : ''}
-                </div>
-                <button onclick="enablePerson('${p.uuid}')" class="btn-primary-green" style="padding:4px 8px; font-size:0.7rem; border-radius:6px; cursor:pointer;">启用</button>
-            `;
-            cardsContainer.appendChild(card);
-        });
-    }
-    
+    col.appendChild(cardsContainer);
     return col;
 }
+
+async function moveCategoryUp(index) {
+    if (index <= 0) return;
+    const activeCategories = globalCategories.filter(c => !c.is_deleted);
+    const currentCat = activeCategories[index];
+    const prevCat = activeCategories[index - 1];
+    
+    const idx1 = globalCategories.findIndex(c => c.uuid === currentCat.uuid);
+    const idx2 = globalCategories.findIndex(c => c.uuid === prevCat.uuid);
+    if (idx1 >= 0 && idx2 >= 0) {
+        const temp = globalCategories[idx1].sort_order;
+        globalCategories[idx1].sort_order = globalCategories[idx2].sort_order;
+        globalCategories[idx2].sort_order = temp;
+        
+        globalCategories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        globalCategories.filter(c => !c.is_deleted).forEach((c, idx) => {
+            c.sort_order = idx;
+        });
+        await syncCategoriesOrder();
+    }
+}
+
+async function moveCategoryDown(index) {
+    const activeCategories = globalCategories.filter(c => !c.is_deleted);
+    if (index >= activeCategories.length - 1) return;
+    const currentCat = activeCategories[index];
+    const nextCat = activeCategories[index + 1];
+    
+    const idx1 = globalCategories.findIndex(c => c.uuid === currentCat.uuid);
+    const idx2 = globalCategories.findIndex(c => c.uuid === nextCat.uuid);
+    if (idx1 >= 0 && idx2 >= 0) {
+        const temp = globalCategories[idx1].sort_order;
+        globalCategories[idx1].sort_order = globalCategories[idx2].sort_order;
+        globalCategories[idx2].sort_order = temp;
+        
+        globalCategories.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        globalCategories.filter(c => !c.is_deleted).forEach((c, idx) => {
+            c.sort_order = idx;
+        });
+        await syncCategoriesOrder();
+    }
+}
+
+
 
 function showToast(msg) {
     let toast = document.getElementById('dino-toast');

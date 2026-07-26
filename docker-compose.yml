@@ -22,6 +22,11 @@ services:
       # Persists DB in data volume and media uploads in uploads volume
       - /opt/docker/dinoroar/data:/workspace/data
       - /opt/docker/dinoroar/uploads:/workspace/uploads
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
 
@@ -40,6 +45,11 @@ services:
     volumes:
       # Caches ONNX models to avoid redownloading on container recreation
       - ./stt/models:/app/models
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
 

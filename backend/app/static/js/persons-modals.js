@@ -53,7 +53,7 @@ async function saveCategoryModal() {
 async function deleteCategory(uuid) {
     const ok = await showCustomConfirm(
         "确认停用该分类？",
-        "确定要停用这个分类吗？该分类将被逻辑归档至已停用列表，分类下的人物会自动归入【未分类】中，以往的历史数据依然完整保留。\n\n您随时可以从‘已停用列表’中重新启用此分类。",
+        "确定要停用这个分类吗？停用后该分类在日记选择和首页看板中将不再显示，但下属人物的状态本身不受影响，以往的历史数据依然完整保留。\n\n您随时可以从‘已停用列表’中重新启用此分类。",
         "确认停用"
     );
     if (!ok) return;
@@ -220,7 +220,16 @@ async function deletePersonFromModal() {
 async function enableCategory(uuid) {
     const cat = globalCategories.find(c => c.uuid === uuid);
     if (!cat) return;
+    const ok = await showCustomConfirm(
+        "确认恢复启用分类？",
+        `确定要恢复启用分类 "${cat.name}" 吗？启用后，它将重新显示在写日记和首页看板的分类列表中，其以往的历史数据均保持完整。`,
+        "确认启用"
+    );
+    if (!ok) return;
     try {
+        const activeCategories = globalCategories.filter(c => !c.is_deleted);
+        const maxSort = activeCategories.length > 0 ? Math.max(...activeCategories.map(c => c.sort_order || 0)) : -1;
+        
         const res = await fetch('/api/categories/sync', {
             method: 'POST',
             headers: {
@@ -231,7 +240,7 @@ async function enableCategory(uuid) {
                 categories: [{
                     uuid: cat.uuid,
                     name: cat.name,
-                    sort_order: cat.sort_order,
+                    sort_order: maxSort + 1,
                     is_deleted: false
                 }],
                 deleted_uuids: []
@@ -251,6 +260,64 @@ async function enablePerson(uuid) {
     const person = globalPersons.find(p => p.uuid === uuid);
     if (!person) return;
     try {
+        const activePersonsInCat = globalPersons.filter(p => p.category_uuid === person.category_uuid && !p.is_deleted);
+        const maxSort = activePersonsInCat.length > 0 ? Math.max(...activePersonsInCat.map(p => p.sort_order || 0)) : -1;
+
+        const res = await fetch('/api/persons/sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+                persons: [{
+                    uuid: person.uuid,
+                    name: person.name,
+                    abbreviation: person.abbreviation,
+                    relationship: person.relationship,
+                    category_uuid: person.category_uuid,
+                    sort_order: maxSort + 1,
+                    color_tag: person.color_tag,
+                    is_temporary: person.is_temporary,
+                    is_deleted: false,
+                    created_at: person.created_at
+                }],
+                deleted_uuids: []
+            })
+        });
+        if (res.ok) {
+            await fetchPersons();
+            showToast(`关系人 "${person.name}" 已恢复启用！`);
+        }
+    } catch (e) {
+        console.error("Failed to enable person", e);
+    }
+}
+
+async function enablePersonDirect(uuid, event) {
+    if (event) event.stopPropagation();
+    const person = globalPersons.find(p => p.uuid === uuid);
+    if (!person) return;
+    const ok = await showCustomConfirm(
+        "确认恢复启用关系人？",
+        `确定要恢复启用关系人 "${person.name}" 吗？启用后，他们将重新显示在写日记和分类看板的人物列表中，并在其原有的分类中可见。`,
+        "确认启用"
+    );
+    if (!ok) return;
+    await enablePerson(uuid);
+}
+
+async function deletePersonDirect(uuid, event) {
+    if (event) event.stopPropagation();
+    const person = globalPersons.find(p => p.uuid === uuid);
+    if (!person) return;
+    const ok = await showCustomConfirm(
+        "确认停用该关系人？",
+        `确定要停用关系人 "${person.name}" 吗？停用后，他们将不再出现在选择名单和分类看板中。以前日记中的记录依然完整保留，且您随时可以从下方的已停用列表中恢复启用。`,
+        "确认停用"
+    );
+    if (!ok) return;
+    try {
         const res = await fetch('/api/persons/sync', {
             method: 'POST',
             headers: {
@@ -267,7 +334,7 @@ async function enablePerson(uuid) {
                     sort_order: person.sort_order,
                     color_tag: person.color_tag,
                     is_temporary: person.is_temporary,
-                    is_deleted: false,
+                    is_deleted: true,
                     created_at: person.created_at
                 }],
                 deleted_uuids: []
@@ -275,9 +342,8 @@ async function enablePerson(uuid) {
         });
         if (res.ok) {
             await fetchPersons();
-            showToast(`关系人 "${person.name}" 已恢复启用！`);
         }
     } catch (e) {
-        console.error("Failed to enable person", e);
+        console.error("Failed to delete person direct", e);
     }
 }

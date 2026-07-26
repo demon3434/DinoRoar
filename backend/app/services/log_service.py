@@ -5,9 +5,8 @@ import logging
 from typing import List, Optional
 from sqlalchemy import or_, and_, desc
 from sqlalchemy.orm import Session, selectinload
-from ..models import Log, Attachment, User, Person, PersonCategory
+from ..models import Log, Attachment, User, Person, PersonCategory, DinoConfig
 from ..schemas import LogSyncPayload
-from .analytics_service import extract_high_frequency_words
 
 logger = logging.getLogger("DinoRoar.logs")
 
@@ -154,24 +153,45 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
     happy_mood_ids = {1, 2, 3, 4}
     sad_mood_ids = {7, 8, 9, 10, 11}
     
-    all_logs = db.query(Log).filter(
+    # 1. Query lightweight metadata (ID, incident_date, mood_dino_id, mood_score)
+    # Join with DinoConfig to load mood_score efficiently
+    logs_meta = db.query(
+        Log.id,
+        Log.incident_date,
+        Log.mood_dino_id,
+        DinoConfig.mood_score
+    ).outerjoin(
+        DinoConfig, Log.mood_dino_id == DinoConfig.id
+    ).filter(
         Log.user_id == current_user.id,
         Log.is_deleted == False
-    ).order_by(desc(Log.incident_date))\
-     .options(selectinload(Log.persons), selectinload(Log.attachments), selectinload(Log.dino_config)).all()
-     
+    ).order_by(desc(Log.incident_date)).all()
+
+    # 2. Get set of log IDs that contain media attachments
+    media_log_ids = set(
+        r[0] for r in db.query(Attachment.log_id).filter(
+            Attachment.log_id.isnot(None),
+            or_(
+                Attachment.mime_type.like("image/%"),
+                Attachment.mime_type.like("audio/%"),
+                Attachment.mime_type.like("video/%")
+            )
+        ).all()
+    )
+
+    # 3. Date -> mood mapping for heatmap
     date_mood_map = {}
-    for log in reversed(all_logs):
+    for log_id, incident_date, mood_dino_id, mood_score in reversed(logs_meta):
         try:
-            day_str = log.incident_date.strftime("%Y-%m-%d")
-            date_mood_map[day_str] = log.mood_dino_id
+            day_str = incident_date.strftime("%Y-%m-%d")
+            date_mood_map[day_str] = mood_dino_id
         except Exception:
             pass
             
     sorted_days = sorted(date_mood_map.keys(), reverse=True)[:30]
     mood_heatmap = [{"date": day, "mood": date_mood_map[day]} for day in reversed(sorted_days)]
-    
-    # ---- 1. 蛋能量四宫格增量 & 余额计算 ----
+
+    # 4. Egg energy four-quadrant increments & balance
     today_dt = datetime.date.today()
     start_of_this_week = today_dt - datetime.timedelta(days=today_dt.weekday())
     end_of_this_week = start_of_this_week + datetime.timedelta(days=6)
@@ -179,8 +199,8 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
     end_of_last_week = start_of_this_week - datetime.timedelta(days=1)
     start_of_this_month = today_dt.replace(day=1)
 
-    def calc_log_energy(log_item):
-        has_media = any(att.mime_type.startswith("image/") or att.mime_type.startswith("audio/") or att.mime_type.startswith("video/") for att in log_item.attachments)
+    def calc_log_energy(log_id):
+        has_media = log_id in media_log_ids
         return 30 if has_media else 10
 
     total_accumulated_energy = 0
@@ -189,11 +209,11 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
     energy_last_week = 0
     energy_this_month = 0
 
-    for log in all_logs:
-        if not log.incident_date:
+    for log_id, incident_date, mood_dino_id, mood_score in logs_meta:
+        if not incident_date:
             continue
-        log_date = log.incident_date.date() if isinstance(log.incident_date, datetime.datetime) else log.incident_date
-        e = calc_log_energy(log)
+        log_date = incident_date.date() if isinstance(incident_date, datetime.datetime) else incident_date
+        e = calc_log_energy(log_id)
         total_accumulated_energy += e
         if log_date == today_dt:
             energy_today += e
@@ -216,7 +236,34 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         "this_month": energy_this_month
     }
 
-    # ---- 2. 时光机自然周期回顾 ----
+    # 5. Fetch all persons and relationship associations
+    from ..models import log_person_association
+    
+    persons_list = db.query(Person).filter(
+        Person.user_id == current_user.id,
+        Person.is_deleted == False
+    ).all()
+    person_map = {p.uuid: p for p in persons_list}
+
+    # Query association records between logs and persons
+    associations = db.query(
+        log_person_association.c.person_uuid,
+        Log.id.label("log_id")
+    ).join(
+        Log, Log.uuid == log_person_association.c.log_uuid
+    ).filter(
+        Log.user_id == current_user.id,
+        Log.is_deleted == False
+    ).all()
+
+    # Map log_id -> person_uuids
+    log_persons = {}
+    for person_uuid, log_id in associations:
+        if log_id not in log_persons:
+            log_persons[log_id] = []
+        log_persons[log_id].append(person_uuid)
+
+    # 6. Time machine reviews
     next_month = start_of_this_month.replace(day=28) + datetime.timedelta(days=4)
     end_of_this_month = next_month - datetime.timedelta(days=next_month.day)
 
@@ -238,7 +285,11 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
     end_of_last_year = start_of_this_year - datetime.timedelta(days=1)
 
     def filter_logs_in_period(s_date, e_date):
-        return [l for l in all_logs if l.incident_date and (s_date <= (l.incident_date.date() if isinstance(l.incident_date, datetime.datetime) else l.incident_date) <= e_date)]
+        return [
+            (log_id, incident_date, mood_dino_id, mood_score)
+            for log_id, incident_date, mood_dino_id, mood_score in logs_meta
+            if incident_date and s_date <= (incident_date.date() if isinstance(incident_date, datetime.datetime) else incident_date) <= e_date
+        ]
 
     this_week_logs = filter_logs_in_period(start_of_this_week, end_of_this_week)
     last_week_logs = filter_logs_in_period(start_of_last_week, end_of_last_week)
@@ -257,16 +308,18 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         mid_c = 0
         low_c = 0
         p_person_counts = {}
-        for l in logs_in_p:
-            score = l.dino_config.mood_score if l.dino_config and l.dino_config.mood_score is not None else 5
-            if score >= 7 or l.mood_dino_id in happy_mood_ids:
+        for log_id, incident_date, mood_dino_id, mood_score in logs_in_p:
+            score = mood_score if mood_score is not None else 5
+            if score >= 7 or mood_dino_id in happy_mood_ids:
                 high_c += 1
-            elif score <= 3 or l.mood_dino_id in sad_mood_ids:
+            elif score <= 3 or mood_dino_id in sad_mood_ids:
                 low_c += 1
             else:
                 mid_c += 1
-            for p in l.persons:
-                p_person_counts[p.uuid] = p_person_counts.get(p.uuid, 0) + 1
+            
+            p_uuids = log_persons.get(log_id, [])
+            for p_uuid in p_uuids:
+                p_person_counts[p_uuid] = p_person_counts.get(p_uuid, 0) + 1
         
         total_m = float(c)
         if c == 0:
@@ -274,11 +327,10 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         else:
             pcts = [round(high_c / total_m * 100), round(mid_c / total_m * 100), round(low_c / total_m * 100)]
         
-        all_p_objs = {p.uuid: p for l in logs_in_p for p in l.persons}
         top_p_list = []
         sorted_p_uuids = sorted(p_person_counts.keys(), key=lambda x: p_person_counts[x], reverse=True)[:3]
         for p_uuid in sorted_p_uuids:
-            p_obj = all_p_objs.get(p_uuid)
+            p_obj = person_map.get(p_uuid)
             if p_obj:
                 top_p_list.append({
                     "uuid": p_uuid,
@@ -301,41 +353,64 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         "year": build_period_item(this_year_logs, len(last_year_logs), start_of_this_year, end_of_this_year)
     }
 
-    # ---- 3. 关系人分类晴雨表 ----
-    categories = db.query(PersonCategory).filter(
-        PersonCategory.user_id == current_user.id,
-        PersonCategory.is_deleted == False
-    ).order_by(PersonCategory.sort_order).all()
-
-    all_persons_db = db.query(Person).filter(
-        Person.user_id == current_user.id,
-        Person.is_deleted == False
-    ).all()
-
+    # 7. Person Categories & Galaxy map
     person_stats = {}
-    for p in all_persons_db:
-        p_logs = [l for l in all_logs if p.uuid in [lp.uuid for lp in l.persons]]
-        happy_cnt = 0
-        calm_cnt = 0
-        sad_cnt = 0
-        for l in p_logs:
-            score = l.dino_config.mood_score if l.dino_config and l.dino_config.mood_score is not None else 5
-            if score >= 7 or l.mood_dino_id in happy_mood_ids:
-                happy_cnt += 1
-            elif score <= 3 or l.mood_dino_id in sad_mood_ids:
-                sad_cnt += 1
-            else:
-                calm_cnt += 1
+    for p in persons_list:
         person_stats[p.uuid] = {
             "uuid": p.uuid,
             "name": p.name,
             "relationship": p.relationship or "朋友",
             "category_uuid": p.category_uuid,
-            "diary_count": len(p_logs),
-            "happy_count": happy_cnt,
-            "calm_count": calm_cnt,
-            "sad_count": sad_cnt
+            "diary_count": 0,
+            "happy_count": 0,
+            "calm_count": 0,
+            "sad_count": 0
         }
+
+    log_details_map = {log_id: (mood_dino_id, mood_score, incident_date) for log_id, incident_date, mood_dino_id, mood_score in logs_meta}
+
+    person_scores = {}
+    person_counts = {}
+    person_last_date = {}
+    
+    for person_uuid, log_id in associations:
+        if log_id in log_details_map:
+            mood_dino_id, mood_score, incident_date = log_details_map[log_id]
+            
+            # Category summaries stats
+            if person_uuid in person_stats:
+                stats = person_stats[person_uuid]
+                stats["diary_count"] += 1
+                score = mood_score if mood_score is not None else 5
+                if score >= 7 or mood_dino_id in happy_mood_ids:
+                    stats["happy_count"] += 1
+                elif score <= 3 or mood_dino_id in sad_mood_ids:
+                    stats["sad_count"] += 1
+                else:
+                    stats["calm_count"] += 1
+            
+            # Galaxy and affinity stats
+            score_val = 0
+            if mood_dino_id in happy_mood_ids:
+                score_val = 1
+            elif mood_dino_id in sad_mood_ids:
+                score_val = -1
+                
+            if person_uuid not in person_scores:
+                person_scores[person_uuid] = 0
+                person_counts[person_uuid] = 0
+                person_last_date[person_uuid] = incident_date
+            else:
+                if incident_date > person_last_date[person_uuid]:
+                    person_last_date[person_uuid] = incident_date
+            
+            person_scores[person_uuid] += score_val
+            person_counts[person_uuid] += 1
+
+    categories = db.query(PersonCategory).filter(
+        PersonCategory.user_id == current_user.id,
+        PersonCategory.is_deleted == False
+    ).order_by(PersonCategory.sort_order).all()
 
     category_summaries = []
     all_person_list = list(person_stats.values())
@@ -371,51 +446,22 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
                 "persons": all_person_list
             })
 
-    person_scores = {}
-    person_counts = {}
-    person_last_date = {}
-    
-    for log in all_logs:
-        mood_id = log.mood_dino_id
-        score = 0
-        if mood_id in happy_mood_ids:
-            score = 1
-        elif mood_id in sad_mood_ids:
-            score = -1
-            
-        for person in log.persons:
-            p_uuid = person.uuid
-            if p_uuid not in person_scores:
-                person_scores[p_uuid] = 0
-                person_counts[p_uuid] = 0
-                person_last_date[p_uuid] = log.incident_date
-            else:
-                if log.incident_date > person_last_date[p_uuid]:
-                    person_last_date[p_uuid] = log.incident_date
-            
-            person_scores[p_uuid] += score
-            person_counts[p_uuid] += 1
-
-    person_map = {p.uuid: p for p in all_persons_db}
-    
+    # Build relationship galaxy graph
     nodes = [{"id": "child", "name": "我", "val": 15, "category": "me", "color_tag": "amber", "happy_count": 0, "sad_count": 0}]
     links = []
     
     for p_uuid, count in person_counts.items():
         p_obj = person_map.get(p_uuid)
         if p_obj:
-            friend_logs = [log for log in all_logs if p_uuid in [p.uuid for p in log.persons]]
-            f_happy = sum(1 for log in friend_logs if log.mood_dino_id in happy_mood_ids)
-            f_sad = sum(1 for log in friend_logs if log.mood_dino_id in sad_mood_ids)
-            
+            stats = person_stats.get(p_uuid, {})
             nodes.append({
                 "id": p_uuid,
                 "name": p_obj.name,
                 "val": min(12, 4 + count),
                 "category": p_obj.relationship or "朋友",
                 "color_tag": p_obj.color_tag or "red",
-                "happy_count": f_happy,
-                "sad_count": f_sad
+                "happy_count": stats.get("happy_count", 0),
+                "sad_count": stats.get("sad_count", 0)
             })
             links.append({
                 "source": "child",
@@ -447,75 +493,24 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
     happy_buddies = happy_buddies[:5]
     warm_hug_buddies = warm_hug_buddies[:5]
     
-    text_contents = [log.content for log in all_logs[:30]] + [log.own_thoughts for log in all_logs[:30] if log.own_thoughts]
-    words_list = extract_high_frequency_words(text_contents)
+    # 8. AI Caring Tips (Word cloud features deleted, words array always empty)
+    recent_scores = []
+    for log_id, incident_date, mood_dino_id, mood_score in logs_meta[:5]:
+        if mood_dino_id in happy_mood_ids:
+            recent_scores.append(5)
+        elif mood_dino_id in sad_mood_ids:
+            recent_scores.append(1)
+        else:
+            recent_scores.append(3)
+            
+    avg_score = sum(recent_scores) / len(recent_scores) if recent_scores else 3.0
     
-    recent_logs = all_logs[:5]
-    avg_score = 3.0
-    if recent_logs:
-        scores = []
-        for l in recent_logs:
-            if l.mood_dino_id in happy_mood_ids:
-                scores.append(5)
-            elif l.mood_dino_id in sad_mood_ids:
-                scores.append(1)
-            else:
-                scores.append(3)
-        avg_score = sum(scores) / len(scores)
-        
     tips = "你的小恐龙基地一片风和日丽 ☀️！你最近一定遇到了很多好玩的事情，小伙伴们也很喜欢和你一起玩！快去给乐园解锁更多的恐龙伙伴吧！🦖✨"
     if avg_score < 2.5:
-        tips = "最近小恐龙的草地上有一点下小雨 🌧️ 呢。别担心，悄悄写下日记把它们装进秘密基地，或者找喜欢的人抱抱！只要你愿意说出来，天空很快就会放晴的！🦕☔"
+        tips = "最近小恐龙的草地有一点下小雨 🌧️ 呢。别担心，悄悄写下日记把它们装进秘密基地，或者找喜欢的人抱抱！只要你愿意说出来，天空很快就会放晴的！🦕☔"
     elif avg_score < 4.0:
         tips = "平静普通的一天，小恐龙也在惬意地打哈欠 ⛅。继续记录你的日常点滴吧，每一个小小的脚印都是珍贵的回忆哦！🍃"
         
-    if words_list:
-        top_keyword = words_list[0]["text"]
-        tips += f" 悄悄告诉你，你最近提到了好几次“{top_keyword}”，这似乎是你的超级焦点呢！"
-        
-    cinema_logs = []
-    for log in all_logs:
-        if len(cinema_logs) >= 10:
-            break
-        if log.attachments:
-            has_img = any(att.mime_type.startswith("image/") for att in log.attachments)
-            has_aud = any(att.mime_type.startswith("audio/") for att in log.attachments)
-            if has_img or has_aud:
-                atts = []
-                for att in log.attachments:
-                    atts.append({
-                        "uuid": att.uuid,
-                        "mime_type": att.mime_type,
-                        "url": f"/api/attachments/download/{att.uuid}"
-                    })
-                clean_content = re.sub(r'\[sticker:[^\]]+\]', '', log.content).strip()
-                cinema_logs.append({
-                    "uuid": log.uuid,
-                    "title": log.title or "无标题",
-                    "content": clean_content,
-                    "incident_date": log.incident_date.strftime("%Y-%m-%d %H:%M") if isinstance(log.incident_date, datetime.datetime) else str(log.incident_date),
-                    "attachments": atts,
-                    "mood_dino_id": log.mood_dino_id
-                })
-    if not cinema_logs and all_logs:
-        log = all_logs[0]
-        atts = []
-        for att in log.attachments:
-            atts.append({
-                "uuid": att.uuid,
-                "mime_type": att.mime_type,
-                "url": f"/api/attachments/download/{att.uuid}"
-            })
-        clean_content = re.sub(r'\[sticker:[^\]]+\]', '', log.content).strip()
-        cinema_logs.append({
-            "uuid": log.uuid,
-            "title": log.title or "无标题",
-            "content": clean_content,
-            "incident_date": log.incident_date.strftime("%Y-%m-%d %H:%M") if isinstance(log.incident_date, datetime.datetime) else str(log.incident_date),
-            "attachments": atts,
-            "mood_dino_id": log.mood_dino_id
-        })
-
     return {
         "egg_energy": egg_energy_data,
         "period_reviews": period_reviews,
@@ -530,8 +525,8 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
             "warm_hug_buddies": warm_hug_buddies
         },
         "ai_word_cloud_tips": {
-            "words": words_list,
+            "words": [],
             "tips": tips
         },
-        "cinema_logs": cinema_logs
+        "cinema_logs": []
     }

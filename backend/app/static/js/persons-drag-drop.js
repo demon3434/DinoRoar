@@ -48,14 +48,16 @@ function setupPersonsDragAndDrop() {
         col.addEventListener('drop', async (e) => {
             col.classList.remove('dragover');
             if (draggedType === 'column') {
-                const fromIndex = parseInt(e.dataTransfer.getData('column-index'));
+                const fromUuid = draggedNode.getAttribute('data-uuid');
                 const targetUuid = col.getAttribute('data-uuid');
+                const fromIndex = globalCategories.findIndex(c => c.uuid === fromUuid);
                 const toIndex = globalCategories.findIndex(c => c.uuid === targetUuid);
                 if (fromIndex !== toIndex && fromIndex >= 0 && toIndex >= 0) {
                     const [moved] = globalCategories.splice(fromIndex, 1);
                     globalCategories.splice(toIndex, 0, moved);
                     
-                    globalCategories.forEach((c, idx) => {
+                    const activeCategories = globalCategories.filter(c => !c.is_deleted);
+                    activeCategories.forEach((c, idx) => {
                         c.sort_order = idx;
                     });
 

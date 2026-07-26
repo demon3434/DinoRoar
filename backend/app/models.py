@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship as orm_relationship
 from .database import Base
 
@@ -50,11 +50,15 @@ log_person_association = Table(
     "log_person_association",
     Base.metadata,
     Column("log_uuid", String, ForeignKey("logs.uuid", ondelete="CASCADE"), primary_key=True),
-    Column("person_uuid", String, ForeignKey("persons.uuid", ondelete="CASCADE"), primary_key=True)
+    Column("person_uuid", String, ForeignKey("persons.uuid", ondelete="CASCADE"), primary_key=True, index=True)
 )
 
 class Log(Base):
     __tablename__ = "logs"
+
+    __table_args__ = (
+        Index("idx_logs_user_deleted_incident", "user_id", "is_deleted", "incident_date"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -92,6 +96,10 @@ class Log(Base):
 class PersonCategory(Base):
     __tablename__ = "person_categories"
 
+    __table_args__ = (
+        Index("idx_categories_user_deleted", "user_id", "is_deleted"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     uuid = Column(String, unique=True, index=True, nullable=False)
@@ -106,6 +114,10 @@ class PersonCategory(Base):
 
 class Person(Base):
     __tablename__ = "persons"
+
+    __table_args__ = (
+        Index("idx_persons_user_deleted", "user_id", "is_deleted"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -132,7 +144,7 @@ class Attachment(Base):
     __tablename__ = "attachments"
 
     id = Column(Integer, primary_key=True, index=True)
-    log_id = Column(Integer, ForeignKey("logs.id", ondelete="CASCADE"), nullable=True)
+    log_id = Column(Integer, ForeignKey("logs.id", ondelete="CASCADE"), nullable=True, index=True)
     log_uuid = Column(String, nullable=True, index=True)
     
     # Client-generated file UUID
