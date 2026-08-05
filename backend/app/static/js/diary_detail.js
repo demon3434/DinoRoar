@@ -284,7 +284,7 @@ function renderLogDetail(log) {
                 }
             }
             stickersHtml += `
-                <div style="position: absolute; left: ${st.x}px; top: ${st.y}px; width: 56px; height: 56px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
+                <div style="position: absolute; left: min(${(st.x / 360) * 100}%, calc(100% - 56px)); top: min(${st.y}px, calc(100% - 56px)); width: 56px; height: 56px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
                     <img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='/static/images/ic_launcher.png'" />
                 </div>
             `;
