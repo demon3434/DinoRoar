@@ -96,15 +96,7 @@ function setupPersonsDragAndDrop() {
                 const personObj = globalPersons.find(p => p.uuid === personUuid);
                 if (!personObj) return;
 
-                const newCatUuid = (targetColUuid === 'unclassified' || targetColUuid === 'temporary') ? null : targetColUuid;
-                personObj.category_uuid = newCatUuid;
-
-                if (personObj.is_temporary && targetColUuid !== 'temporary') {
-                    personObj.is_temporary = false;
-                    if (!personObj.relationship || personObj.relationship === '临时路人') {
-                        personObj.relationship = '朋友';
-                    }
-                }
+                personObj.category_uuid = targetColUuid;
 
                 const cardElements = [...container.querySelectorAll('.person-card')];
                 const syncList = [];

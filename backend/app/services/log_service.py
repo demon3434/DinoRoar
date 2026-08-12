@@ -68,6 +68,20 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
             existing_log.version = max(existing_log.version, log_data.version) + 1
             
             existing_log.persons = associated_persons
+
+            # 更新/保存背景画布关联
+            from ..models import LogCanvas
+            log_canvas = db.query(LogCanvas).filter(LogCanvas.log_uuid == existing_log.uuid).first()
+            if log_canvas:
+                log_canvas.canvas_instance_id = log_data.canvas_instance_id
+                log_canvas.canvas_aspect_ratio = log_data.canvas_aspect_ratio
+            else:
+                log_canvas = LogCanvas(
+                    log_uuid=existing_log.uuid,
+                    canvas_instance_id=log_data.canvas_instance_id,
+                    canvas_aspect_ratio=log_data.canvas_aspect_ratio
+                )
+                db.add(log_canvas)
         else:
             client_updated_at = log_data.updated_at
             if client_updated_at and client_updated_at.tzinfo is not None:
@@ -86,6 +100,15 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
             )
             new_log.persons = associated_persons
             db.add(new_log)
+
+            # 新增背景画布关联
+            from ..models import LogCanvas
+            log_canvas = LogCanvas(
+                log_uuid=new_log.uuid,
+                canvas_instance_id=log_data.canvas_instance_id,
+                canvas_aspect_ratio=log_data.canvas_aspect_ratio
+            )
+            db.add(log_canvas)
             
             earned_energy = 10
             has_media = db.query(Attachment).filter(Attachment.log_uuid == log_data.uuid).first() is not None
@@ -146,7 +169,39 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
         Log.is_deleted == False
     ).options(selectinload(Log.attachments), selectinload(Log.persons)).all()
 
+    populate_log_canvas_details(db, active_logs_loaded)
     return active_logs_loaded
+
+
+def populate_log_canvas_details(db: Session, logs: List[Log]):
+    """
+    辅助函数：从独立的 log_canvases 关联表和 canvas_instances 实例表中查询，
+    为 logs 列表的各个元素动态填入 canvas_instance_id、canvas_aspect_ratio、canvas_image_url
+    """
+    if not logs:
+        return
+    from ..models import LogCanvas, CanvasInstance
+    log_uuids = [log.uuid for log in logs]
+    log_canvases = db.query(LogCanvas).filter(LogCanvas.log_uuid.in_(log_uuids)).all()
+    log_canvas_map = {lc.log_uuid: lc for lc in log_canvases}
+
+    instance_ids = [lc.canvas_instance_id for lc in log_canvases if lc.canvas_instance_id]
+    instance_url_map = {}
+    if instance_ids:
+        canvas_instances = db.query(CanvasInstance).filter(CanvasInstance.id.in_(instance_ids)).all()
+        instance_url_map = {inst.id: inst.image_url for inst in canvas_instances}
+
+    for log in logs:
+        lc = log_canvas_map.get(log.uuid)
+        if lc:
+            log.canvas_instance_id = lc.canvas_instance_id
+            log.canvas_aspect_ratio = lc.canvas_aspect_ratio
+            log.canvas_image_url = instance_url_map.get(lc.canvas_instance_id) if lc.canvas_instance_id else None
+        else:
+            log.canvas_instance_id = None
+            log.canvas_aspect_ratio = "2:1"
+            log.canvas_image_url = None
+
 
 
 def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
@@ -435,7 +490,7 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         if uncategorized_persons:
             category_summaries.append({
                 "uuid": "uncategorized",
-                "name": "未分类",
+                "name": "其他",
                 "persons": uncategorized_persons
             })
     else:

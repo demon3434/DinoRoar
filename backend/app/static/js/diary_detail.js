@@ -227,9 +227,37 @@ function renderLogDetail(log) {
     // Generate stickers HTML
     let stickersHtml = '';
     if (stickersList.length > 0) {
+        const aspectStr = log.canvas_aspect_ratio || "2:1";
+        const parts = aspectStr.split(":");
+        const wPart = parseFloat(parts[0]) || 2;
+        const hPart = parseFloat(parts[1]) || 1;
+        const ratioVal = wPart / hPart;
+        const logicalHeight = 360 / ratioVal;
+
+        let fallbackUrl = '/static/images/canvas_fallback_2_1.jpg';
+        if (aspectStr === "16:9") {
+            fallbackUrl = '/static/images/canvas_fallback_16_9.jpg';
+        } else if (aspectStr === "4:3") {
+            fallbackUrl = '/static/images/canvas_fallback_4_3.jpg';
+        } else if (aspectStr === "1:1") {
+            fallbackUrl = '/static/images/canvas_fallback_1_1.jpg';
+        } else if (aspectStr === "2:1") {
+            fallbackUrl = '/static/images/canvas_fallback_2_1.jpg';
+        }
+
+        let bgStyle = '';
+        if (log.canvas_instance_id) {
+            if (log.canvas_image_url) {
+                bgStyle = `background-image: url('${log.canvas_image_url}'); background-size: cover; background-position: center;`;
+            } else {
+                bgStyle = `background-image: url('${fallbackUrl}'); background-size: cover; background-repeat: no-repeat; background-position: center;`;
+            }
+        } else {
+            bgStyle = `background-color: var(--card-bg, #ffffff);`;
+        }
+
         stickersHtml = `
-            <div style="margin-top: 15px; height: 180px; width: 100%; position: relative; overflow: hidden; background: rgba(120, 120, 120, 0.05); border: 1px solid var(--card-border); border-radius: 12px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.08);">
-                <div style="position:absolute; left:12px; top:12px; font-size:0.75rem; color:var(--text-muted); font-family:monospace; font-weight:bold;">🎨 装饰手账贴纸墙</div>
+            <div style="margin-top: 15px; width: 100%; aspect-ratio: ${wPart} / ${hPart}; position: relative; overflow: hidden; border: 1px solid var(--card-border); border-radius: 12px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.08); ${bgStyle}">
         `;
         
         const dinoIconMap = {
@@ -283,8 +311,17 @@ function renderLogDetail(log) {
                     srcUrl = `/static/images/dinosaurs/${assetName}.png`;
                 }
             }
+            
+            const maxLogicX = 360 - 56;
+            const maxLogicY = logicalHeight - 56;
+            const safeX = Math.max(0, Math.min(st.x, maxLogicX));
+            const safeY = Math.max(0, Math.min(st.y, maxLogicY));
+
+            const leftPercent = (safeX / 360) * 100;
+            const topPercent = (safeY / logicalHeight) * 100;
+            
             stickersHtml += `
-                <div style="position: absolute; left: min(${(st.x / 360) * 100}%, calc(100% - 56px)); top: min(${st.y}px, calc(100% - 56px)); width: 56px; height: 56px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
+                <div style="position: absolute; left: ${leftPercent}%; top: ${topPercent}%; width: 15.5556%; aspect-ratio: 1 / 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
                     <img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='/static/images/ic_launcher.png'" />
                 </div>
             `;

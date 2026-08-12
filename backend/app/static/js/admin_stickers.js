@@ -1,6 +1,7 @@
 let activeCropper = null, editCropper = null, loadedSeriesData = [], activeFolderId = null, activeStickerObj = null;
 let selectedExportSeriesIds = new Set();
 let isExportMode = false;
+
 function openCustomConfirm(message, onConfirm) {
     document.getElementById('confirmMessage').textContent = message;
     const modal = document.getElementById('customConfirmModal'); modal.style.display = 'flex';
@@ -8,12 +9,11 @@ function openCustomConfirm(message, onConfirm) {
     okBtn.onclick = () => { modal.style.display = 'none'; if (onConfirm) onConfirm(); };
     cancelBtn.onclick = () => { modal.style.display = 'none'; };
 }
+
 async function loadStickerManagementData() {
     const seriesContainer = document.getElementById('seriesContainer');
     try {
-        const res = await fetch('/api/stickers/config', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
-        if (!res.ok) throw new Error("拉取配置数据失败");
-        loadedSeriesData = await res.json();
+        loadedSeriesData = await stickersApi.fetchConfig();
         renderFolders(loadedSeriesData);
         if (activeFolderId !== null) {
             const folder = loadedSeriesData.find(s => s.id === activeFolderId);
@@ -24,6 +24,7 @@ async function loadStickerManagementData() {
         seriesContainer.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--dino-red);">拉取贴纸配置失败！</div>`;
     }
 }
+
 function renderFolders(data) {
     const container = document.getElementById('seriesContainer'); container.innerHTML = '';
     if (!data || data.length === 0) {
@@ -81,34 +82,7 @@ function renderFolders(data) {
         container.appendChild(card);
     });
 }
-let draggedFolder = null;
-function handleFolderDragStart(e) { draggedFolder = this; e.dataTransfer.effectAllowed = 'move'; this.style.opacity = '0.4'; }
-function handleFolderDragOver(e) { if (e.preventDefault) e.preventDefault(); return false; }
-function handleFolderDragEnter() { this.classList.add('over'); }
-function handleFolderDragLeave() { this.classList.remove('over'); }
-function handleFolderDrop(e) {
-    e.stopPropagation();
-    if (draggedFolder !== this) {
-        const container = document.getElementById('seriesContainer'), children = [...container.children];
-        const from = children.indexOf(draggedFolder), to = children.indexOf(this);
-        if (from < to) container.insertBefore(draggedFolder, this.nextSibling); else container.insertBefore(draggedFolder, this);
-        saveNewSeriesOrder();
-    }
-    return false;
-}
-function handleFolderDragEnd() { this.style.opacity = '1'; document.querySelectorAll('.folder-card').forEach(f => f.classList.remove('over')); }
-async function saveNewSeriesOrder() {
-    const ids = [...document.getElementById('seriesContainer').children].map(c => parseInt(c.getAttribute('data-id'))).filter(id => !isNaN(id));
-    try {
-        const res = await fetch('/api/stickers/admin/series/sort', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: JSON.stringify({ series_ids: ids })
-        });
-        if (!res.ok) throw new Error("保存顺序失败");
-        showToast("分类顺序已成功保存！", "success"); loadStickerManagementData();
-    } catch(err) { showToast(err.message, "error"); }
-}
+
 function handleSearch() {
     const query = document.getElementById('searchSeriesInput').value.trim().toLowerCase();
     document.querySelectorAll('.folder-card').forEach(card => {
@@ -119,6 +93,7 @@ function handleSearch() {
         card.style.display = (seriesMatch || stickerMatch) ? 'flex' : 'none';
     });
 }
+
 function startRename(e, seriesId, currentName) {
     e.stopPropagation();
     const card = document.querySelector(`.folder-card[data-id="${seriesId}"]`);
@@ -127,7 +102,9 @@ function startRename(e, seriesId, currentName) {
     const editBox = document.getElementById(`nameEdit-${seriesId}`); editBox.style.display = 'block';
     const input = document.getElementById(`nameInput-${seriesId}`); input.focus(); input.select();
 }
+
 function handleRenameKey(e, seriesId) { if (e.key === 'Enter') finishRename(seriesId); }
+
 async function finishRename(seriesId) {
     const card = document.querySelector(`.folder-card[data-id="${seriesId}"]`);
     if (card && !isExportMode) card.setAttribute('draggable', 'true');
@@ -136,62 +113,46 @@ async function finishRename(seriesId) {
     editBox.style.display = 'none'; oldBox.style.display = 'inline-flex';
     if (!newName || newName === oldBox.querySelector('span').textContent) return;
     try {
-        const res = await fetch(`/api/stickers/admin/series/${seriesId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: JSON.stringify({ name: newName })
-        });
-        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "重命名失败"); }
+        await stickersApi.updateSeries(seriesId, newName);
         showToast("分类重命名成功！", "success"); loadStickerManagementData();
     } catch(err) { showToast(err.message, "error"); }
 }
+
 function openAddSeriesModal() {
     document.getElementById('seriesName').value = '';
     let maxSort = 0; loadedSeriesData.forEach(s => { if (s.sort_order > maxSort) maxSort = s.sort_order; });
     document.getElementById('seriesSort').value = maxSort + 1;
     document.getElementById('addSeriesModal').style.display = 'flex';
 }
+
 const closeAddSeriesModal = () => document.getElementById('addSeriesModal').style.display = 'none';
+
 async function handleAddSeries() {
     const name = document.getElementById('seriesName').value.trim();
     const sort = parseInt(document.getElementById('seriesSort').value) || 0;
     if (!name) { showToast("请输入系列名称", "error"); return; }
     try {
-        const res = await fetch('/api/stickers/admin/series', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: JSON.stringify({ name, sort_order: sort })
-        });
-        if (!res.ok) throw new Error("创建分类失败");
+        await stickersApi.createSeries(name, sort);
         showToast("系列创建成功！", "success"); closeAddSeriesModal(); loadStickerManagementData();
     } catch(err) { showToast(err.message, "error"); }
 }
+
 async function toggleSeriesActive(seriesId, currentActive) {
     try {
-        const res = await fetch(`/api/stickers/admin/series/${seriesId}/toggle-active`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: JSON.stringify({ is_active: !currentActive })
-        });
-        if (!res.ok) { const data = await res.json(); throw new Error(data.detail || "切换失败"); }
+        await stickersApi.toggleSeriesActive(seriesId, !currentActive);
         showToast(!currentActive ? "分类已启用！" : "分类已停用！", "success"); loadStickerManagementData();
     } catch(err) { showToast(err.message, "error"); }
 }
+
 function deleteSeries(seriesId) {
     const series = loadedSeriesData.find(s => s.id === seriesId); if (!series) return;
     const stickerCount = series.stickers ? series.stickers.length : 0;
     
     if (stickerCount > 0) {
-        // 第一轮警告弹窗
         openCustomConfirm(`⚠️ 警告：贴纸系列【${series.name}】下包含 ${stickerCount} 张贴纸。删除系列将同时物理清空并删除其下的所有贴纸图片！是否确定继续？`, () => {
-            // 第二轮终极防误触确认弹窗
             openCustomConfirm(`🚨 终极操作确认：此操作不可逆！该系列下的 ${stickerCount} 张贴纸图片及关联记录将被彻底物理删除。请再次确认！`, async () => {
                 try {
-                    const res = await fetch(`/api/stickers/admin/series/${seriesId}/cascade`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-                    });
-                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "删除失败"); }
+                    await stickersApi.deleteSeriesCascade(seriesId);
                     showToast("✨ 贴纸系列及其关联贴纸已成功彻底删除！", "success");
                     loadStickerManagementData();
                 } catch(err) { showToast(err.message, "error"); }
@@ -200,16 +161,13 @@ function deleteSeries(seriesId) {
     } else {
         openCustomConfirm(`确定要删除空系列【${series.name}】吗？`, async () => {
             try {
-                const res = await fetch(`/api/stickers/admin/series/${seriesId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-                });
-                if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "删除失败"); }
+                await stickersApi.deleteSeries(seriesId);
                 showToast("分类删除成功！", "success"); loadStickerManagementData();
             } catch(err) { showToast(err.message, "error"); }
         });
     }
 }
+
 let isStickerBatchDeleteMode = false;
 let selectedStickerIds = new Set();
 
@@ -223,6 +181,7 @@ function openFolderDetail(seriesId) {
     else { addBtn.style.display = 'block'; }
     document.getElementById('folderDetailModal').style.display = 'flex';
 }
+
 const closeFolderDetailModal = () => { 
     exitStickerBatchDeleteMode();
     activeFolderId = null; 
@@ -303,18 +262,7 @@ async function handleConfirmBatchDeleteStickersSubmit() {
         const btn = document.getElementById('btnConfirmBatchDeleteStickers');
         btn.disabled = true; btn.textContent = "⏳ 删除中...";
         try {
-            const res = await fetch('/api/stickers/admin/batch-delete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
-                },
-                body: JSON.stringify({ sticker_ids: Array.from(selectedStickerIds) })
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "批量删除失败");
-            }
+            await stickersApi.batchDeleteStickers(Array.from(selectedStickerIds));
             showToast(`✨ 成功彻底删除 ${count} 张贴纸！`, "success");
             exitStickerBatchDeleteMode();
             loadStickerManagementData();
@@ -364,50 +312,29 @@ function renderStickerList(series) {
         grid.appendChild(item);
     });
 }
-let draggedElement = null;
-function handleDragStart(e) { draggedElement = this; e.dataTransfer.effectAllowed = 'move'; this.style.opacity = '0.4'; }
-function handleDragOver(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
-function handleDragEnter() { this.classList.add('over'); }
-function handleDragLeave() { this.classList.remove('over'); }
-function handleDrop(e) {
-    e.stopPropagation();
-    if (draggedElement !== this) {
-        const list = document.getElementById('stickerDetailGrid'), children = [...list.children];
-        const from = children.indexOf(draggedElement), to = children.indexOf(this);
-        if (from < to) list.insertBefore(draggedElement, this.nextSibling); else list.insertBefore(draggedElement, this);
-        saveNewStickersOrder();
-    }
-    return false;
-}
-function handleDragEnd() { this.style.opacity = '1'; document.querySelectorAll('.sticker-item').forEach(i => i.classList.remove('over')); }
-async function saveNewStickersOrder() {
-    const ids = [...document.getElementById('stickerDetailGrid').children].map(c => parseInt(c.getAttribute('data-id'))).filter(id => !isNaN(id));
-    try {
-        const res = await fetch('/api/stickers/admin/sort', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: JSON.stringify({ sticker_ids: ids })
-        });
-        if (!res.ok) throw new Error("保存顺序失败");
-        showToast("顺序已保存！", "success"); loadStickerManagementData();
-    } catch(err) { showToast(err.message, "error"); }
-}
+
 function deleteSticker(e, stickerId, stickerName) {
     e.stopPropagation();
     openCustomConfirm(`确定要软删除贴纸【${stickerName}】吗？`, async () => {
         try {
-            const res = await fetch(`/api/stickers/admin/${stickerId}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
-            if (!res.ok) throw new Error("删除贴纸失败");
+            await stickersApi.deleteSticker(stickerId);
             showToast("贴纸删除成功！", "success"); loadStickerManagementData();
         } catch(err) { showToast(err.message, "error"); }
     });
 }
+
 function openAddStickerModal() {
     if (activeFolderId === null) return;
     document.getElementById('targetFolderSeriesId').value = activeFolderId;
     document.getElementById('stickerName').value = ''; document.getElementById('stickerPrice').value = '10';
     document.getElementById('stickerDesc').value = '';
-    document.getElementById('stickerFile').value = ''; document.getElementById('cropContainer').style.display = 'none';
+    document.getElementById('stickerFile').value = '';
+    
+    // 重置裁剪预览占位状态
+    document.getElementById('cropImage').src = '';
+    document.getElementById('cropImage').style.display = 'none';
+    const placeholder = document.getElementById('stickerCropPlaceholder');
+    if (placeholder) placeholder.style.display = 'flex';
     
     let maxSort = 0;
     const series = loadedSeriesData.find(s => s.id === activeFolderId);
@@ -421,13 +348,24 @@ function openAddStickerModal() {
     if (activeCropper) { activeCropper.destroy(); activeCropper = null; }
     document.getElementById('addStickerModal').style.display = 'flex';
 }
+
 function closeAddStickerModal() { if (activeCropper) { activeCropper.destroy(); activeCropper = null; } document.getElementById('addStickerModal').style.display = 'none'; }
+
 function handleFileSelect(e) {
     const file = e.target.files[0]; if (!file) return;
+    loadBlobToStickerCropper(file);
+}
+
+function loadBlobToStickerCropper(blob) {
     const reader = new FileReader();
     reader.onload = function(event) {
-        const cropImage = document.getElementById('cropImage'); cropImage.src = event.target.result;
-        document.getElementById('cropContainer').style.display = 'block';
+        const cropImage = document.getElementById('cropImage');
+        cropImage.src = event.target.result;
+        cropImage.style.display = 'block';
+        
+        const placeholder = document.getElementById('stickerCropPlaceholder');
+        if (placeholder) placeholder.style.display = 'none';
+        
         if (activeCropper) activeCropper.destroy();
         activeCropper = new Cropper(cropImage, {
             aspectRatio: 1,
@@ -441,8 +379,57 @@ function handleFileSelect(e) {
             toggleDragModeOnDblclick: false
         });
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
 }
+
+function initStickerPasteAndDragEvent() {
+    document.addEventListener("paste", (e) => {
+        const addStickerModal = document.getElementById("addStickerModal");
+        if (addStickerModal && (addStickerModal.style.display === "flex" || addStickerModal.style.display === "block")) {
+            const items = e.clipboardData || e.originalEvent?.clipboardData;
+            if (!items) return;
+            for (const item of items.items) {
+                if (item.type.indexOf("image") !== -1) {
+                    const blob = item.getAsFile();
+                    loadBlobToStickerCropper(blob);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        }
+    });
+    
+    const wrapper = document.getElementById("stickerCropWrapper");
+    if (wrapper) {
+        wrapper.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            wrapper.style.borderColor = "#7c3aed";
+            wrapper.style.background = "rgba(124, 58, 237, 0.05)";
+        });
+        
+        wrapper.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            wrapper.style.borderColor = "rgba(255, 255, 255, 0.08)";
+            wrapper.style.background = "rgba(255, 255, 255, 0.01)";
+        });
+        
+        wrapper.addEventListener("drop", (e) => {
+            e.preventDefault();
+            wrapper.style.borderColor = "rgba(255, 255, 255, 0.08)";
+            wrapper.style.background = "rgba(255, 255, 255, 0.01)";
+            
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                if (file.type.startsWith("image/")) {
+                    loadBlobToStickerCropper(file);
+                }
+            }
+        });
+    }
+}
+
 function handleUploadSticker() {
     const name = document.getElementById('stickerName').value.trim(), seriesId = document.getElementById('targetFolderSeriesId').value;
     const price = document.getElementById('stickerPrice').value, sort = document.getElementById('stickerSort').value, desc = document.getElementById('stickerDesc').value.trim();
@@ -457,12 +444,12 @@ function handleUploadSticker() {
         formData.append('series_id', seriesId); formData.append('name', name);
         formData.append('description', desc); formData.append('sort_order', sort); formData.append('exchange_price', price);
         try {
-            const res = await fetch('/api/stickers/admin/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: formData });
-            if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "上传失败"); }
+            await stickersApi.uploadSticker(formData);
             showToast("贴纸上传成功！", "success"); closeAddStickerModal(); loadStickerManagementData();
         } catch(err) { showToast(err.message, "error"); } finally { btn.disabled = false; btn.textContent = "确认上传并保存"; }
     }, 'image/png');
 }
+
 function openEditStickerModal(st) {
     activeStickerObj = st;
     document.getElementById('editStickerId').value = st.id;
@@ -481,7 +468,9 @@ function openEditStickerModal(st) {
     if (editCropper) { editCropper.destroy(); editCropper = null; }
     document.getElementById('editStickerModal').style.display = 'flex';
 }
+
 function closeEditStickerModal() { if (editCropper) { editCropper.destroy(); editCropper = null; } document.getElementById('editStickerModal').style.display = 'none'; }
+
 function handleEditFileSelect(e) {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
@@ -504,6 +493,7 @@ function handleEditFileSelect(e) {
     };
     reader.readAsDataURL(file);
 }
+
 function handleUpdateSticker() {
     const id = document.getElementById('editStickerId').value, name = document.getElementById('editStickerName').value.trim();
     const price = document.getElementById('editStickerPrice').value, sort = document.getElementById('editStickerSort').value, desc = document.getElementById('editStickerDesc').value.trim();
@@ -515,8 +505,7 @@ function handleUpdateSticker() {
         formData.append('sort_order', sort); formData.append('description', desc);
         if (blob) formData.append('file', blob, 'sticker_edited.png');
         try {
-            const res = await fetch(`/api/stickers/admin/${id}`, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: formData });
-            if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "修改失败"); }
+            await stickersApi.updateSticker(id, formData);
             showToast("贴纸修改保存成功！", "success"); closeEditStickerModal(); loadStickerManagementData();
         } catch(err) { showToast(err.message, "error"); } finally { btn.disabled = false; btn.textContent = "确认保存修改"; }
     };
@@ -525,20 +514,6 @@ function handleUpdateSticker() {
         canvas.toBlob(doUpdate, 'image/png');
     } else doUpdate(null);
 }
-document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', (e) => {
-            if (modal.id === 'customConfirmModal') return;
-            if (e.target === modal) {
-                modal.style.display = 'none';
-                if (modal.id === 'addStickerModal' && activeCropper) { activeCropper.destroy(); activeCropper = null; }
-                if (modal.id === 'editStickerModal' && editCropper) { editCropper.destroy(); editCropper = null; }
-                if (modal.id === 'folderDetailModal') activeFolderId = null;
-            }
-        });
-    });
-    loadStickerManagementData();
-});
 
 function enterExportMode() {
     isExportMode = true;
@@ -609,13 +584,7 @@ async function handleConfirmExportModeSubmit() {
     const btn = document.getElementById('btnConfirmExportMode');
     btn.disabled = true; btn.textContent = "⏳ 正在打包中...";
     try {
-        const res = await fetch(`/api/stickers/export?series_ids=${ids}`, {
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || "导出打包失败");
-        }
+        const res = await stickersApi.exportStickers(ids);
         const blob = await res.blob();
         let fileName = `dinoroar_stickers_export_${new Date().getTime()}.zip`;
         const contentDisposition = res.headers.get('Content-Disposition');
@@ -651,16 +620,7 @@ async function handleImportZipSelected(event) {
     
     showToast("正在读取解析贴纸包...", "info");
     try {
-        const res = await fetch('/api/stickers/import/preview', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') },
-            body: formData
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || "贴纸包预检解析失败");
-        }
-        const data = await res.json();
+        const data = await stickersApi.importPreview(formData);
         renderImportPreviewModal(data);
     } catch(err) {
         showToast(err.message, "error");
@@ -705,16 +665,6 @@ function renderImportPreviewModal(data) {
     document.getElementById('importPreviewModal').style.display = 'flex';
 }
 
-function openStickerImagePreview(imgSrc, name) {
-    document.getElementById('lightboxStickerTitle').textContent = `🔍 ${name || '贴纸原图'}`;
-    document.getElementById('lightboxStickerImage').src = imgSrc;
-    document.getElementById('imageLightboxModal').style.display = 'flex';
-}
-
-function closeImageLightboxModal() {
-    document.getElementById('imageLightboxModal').style.display = 'none';
-}
-
 function closeImportPreviewModal() {
     document.getElementById('importPreviewModal').style.display = 'none';
 }
@@ -732,23 +682,7 @@ async function handleConfirmImportSubmit() {
     const btn = document.getElementById('btnConfirmImport');
     btn.disabled = true; btn.textContent = "⏳ 正在写入落库...";
     try {
-        const res = await fetch('/api/stickers/import/confirm', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            },
-            body: JSON.stringify({
-                temp_token: tempToken,
-                selected_series_names: selectedSeriesNames,
-                conflict_resolution: radioVal
-            })
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || "贴纸落库失败");
-        }
-        const result = await res.json();
+        const result = await stickersApi.importConfirm(tempToken, selectedSeriesNames, radioVal);
         showToast(`🎉 成功导入 ${result.imported_series_count || 0} 个贴纸系列！`, "success");
         closeImportPreviewModal();
         loadStickerManagementData();
@@ -759,3 +693,50 @@ async function handleConfirmImportSubmit() {
     }
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+    const modals = document.querySelectorAll(".modal");
+    modals.forEach(modal => {
+        let isMouseDownOnModalContent = false;
+        const content = modal.querySelector(".modal-content");
+        if (content) {
+            content.addEventListener("mousedown", (e) => {
+                isMouseDownOnModalContent = true;
+            });
+        }
+        modal.addEventListener("mousedown", (e) => {
+            if (e.target === modal) {
+                isMouseDownOnModalContent = false;
+            }
+        });
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal && !isMouseDownOnModalContent) {
+                if (modal.id === 'folderDetailModal') closeFolderDetailModal();
+                else if (modal.id === 'addSeriesModal') closeAddSeriesModal();
+                else if (modal.id === 'addStickerModal') closeAddStickerModal();
+                else if (modal.id === 'editStickerModal') closeEditStickerModal();
+                else if (modal.id === 'customConfirmModal') { modal.style.display = 'none'; }
+                else if (modal.id === 'importPreviewModal') closeImportPreviewModal();
+                else if (modal.id === 'imageLightboxModal') closeImageLightboxModal();
+            }
+            isMouseDownOnModalContent = false;
+        });
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            const visibleModals = [...document.querySelectorAll(".modal")].filter(m => m.style.display === "flex" || m.style.display === "block");
+            if (visibleModals.length > 0) {
+                const modal = visibleModals[visibleModals.length - 1];
+                if (modal.id === 'folderDetailModal') closeFolderDetailModal();
+                else if (modal.id === 'addSeriesModal') closeAddSeriesModal();
+                else if (modal.id === 'addStickerModal') closeAddStickerModal();
+                else if (modal.id === 'editStickerModal') closeEditStickerModal();
+                else if (modal.id === 'customConfirmModal') { modal.style.display = 'none'; }
+                else if (modal.id === 'importPreviewModal') closeImportPreviewModal();
+                else if (modal.id === 'imageLightboxModal') closeImageLightboxModal();
+            }
+        }
+    });
+    loadStickerManagementData();
+    initStickerPasteAndDragEvent();
+});

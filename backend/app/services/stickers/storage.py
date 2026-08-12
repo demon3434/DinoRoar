@@ -45,6 +45,14 @@ def save_sticker_image_file(series_id: int, filename: str, content_bytes: bytes,
     if remove_background:
         from .image_processor import remove_background_and_shadow
         remove_background_and_shadow(file_path, file_path)
+    else:
+        # 如果不去除背景，也直接对其进行 PIL 优化保存以缩减体积
+        try:
+            from PIL import Image
+            with Image.open(file_path) as img:
+                img.save(file_path, format=img.format, optimize=True)
+        except Exception:
+            pass
 
     return f"/static/uploads/stickers/series_{series_id}/{filename}"
 
@@ -118,8 +126,8 @@ def cleanup_sticker_orphans(db: Session) -> dict:
                 rel_path = url.replace("/static/", "", 1)
                 valid_paths.add(os.path.realpath(STATIC_DIR / rel_path))
 
-    cleaned_files_count = 0
-    cleaned_dirs_count = 0
+    deleted_files = []
+    freed_bytes = 0
 
     for root, dirs, files in os.walk(STICKERS_UPLOAD_DIR, topdown=False):
         for f in files:
@@ -127,8 +135,10 @@ def cleanup_sticker_orphans(db: Session) -> dict:
             real_p = os.path.realpath(full_p)
             if real_p not in valid_paths:
                 try:
+                    file_size = os.path.getsize(full_p)
                     os.remove(full_p)
-                    cleaned_files_count += 1
+                    deleted_files.append(os.path.relpath(full_p, STICKERS_UPLOAD_DIR))
+                    freed_bytes += file_size
                 except Exception:
                     pass
 
@@ -136,12 +146,12 @@ def cleanup_sticker_orphans(db: Session) -> dict:
             try:
                 if not os.listdir(root):
                     os.rmdir(root)
-                    cleaned_dirs_count += 1
+                    # Directory removal does not affect freed_bytes
             except Exception:
                 pass
 
     return {
-        "cleaned_files_count": cleaned_files_count,
-        "cleaned_dirs_count": cleaned_dirs_count
+        "deleted_files": deleted_files,
+        "freed_bytes": freed_bytes
     }
 

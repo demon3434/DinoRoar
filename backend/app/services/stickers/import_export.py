@@ -293,7 +293,12 @@ def confirm_import_stickers(
                         ext = src_img_path.suffix or ".png"
                         dest_file_name = f"{uuid.uuid4().hex}{ext}"
                         dest_path = dest_dir / dest_file_name
-                        shutil.copy(src_img_path, dest_path)
+                        try:
+                            from PIL import Image
+                            with Image.open(src_img_path) as img:
+                                img.save(dest_path, format=img.format, optimize=True)
+                        except Exception:
+                            shutil.copy(src_img_path, dest_path)
                         final_image_url = f"/static/uploads/stickers/series_{series_id}/{dest_file_name}"
 
                     if existing_sticker:
@@ -343,6 +348,15 @@ def confirm_import_stickers(
                 imported_count += 1
 
         db.commit()
-        return {"imported_series_count": imported_count}
+        return {
+            "imported_count": imported_count,
+            "message": f"已成功导入 {imported_count} 条贴纸记录"
+        }
     finally:
-        shutil.rmtree(target_dir, ignore_errors=True)
+        # Ensure temporary import cache is always cleaned up
+        try:
+            if target_dir.exists():
+                shutil.rmtree(target_dir, ignore_errors=True)
+                logger.info(f"confirm_import_stickers: cleaned temporary cache {target_dir}")
+        except Exception as e_cleanup:
+            logger.error(f"confirm_import_stickers: failed to clean temporary cache {target_dir}: {e_cleanup}")

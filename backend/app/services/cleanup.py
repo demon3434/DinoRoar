@@ -2,10 +2,11 @@ import os
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from ..models import Attachment
+from ..models import Attachment, CanvasInstance
 from ..config import settings
 
 logger = logging.getLogger("DinoRoar.cleanup")
+cleanup_running = False
 
 def perform_orphan_cleanup(db: Session) -> dict:
     """
@@ -22,7 +23,23 @@ def perform_orphan_cleanup(db: Session) -> dict:
 
     # Gather database files
     all_db_attachments = db.query(Attachment).all()
-    db_file_paths = {os.path.normpath(att.file_path) for att in all_db_attachments}
+    db_file_paths = {os.path.normpath(os.path.abspath(att.file_path)) for att in all_db_attachments}
+    
+    # Gather canvas images
+    canvas_instances = db.query(CanvasInstance).all()
+    canvas_file_paths = set()
+    upload_root = os.path.abspath(settings.upload_dir)
+    for ci in canvas_instances:
+        if ci.image_url:
+            if ci.image_url.startswith("/static/uploads/"):
+                rel_path = ci.image_url.replace("/static/uploads/", "", 1)
+                canvas_file_paths.add(os.path.normpath(os.path.abspath(os.path.join(upload_root, rel_path))))
+            elif ci.image_url.startswith("/static/"):
+                rel_path = ci.image_url.replace("/static/", "", 1)
+                static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+                canvas_file_paths.add(os.path.normpath(os.path.abspath(os.path.join(static_dir, rel_path))))
+    
+    all_valid_paths = db_file_paths.union(canvas_file_paths)
     
     deleted_files = []
     freed_bytes = 0
@@ -31,10 +48,10 @@ def perform_orphan_cleanup(db: Session) -> dict:
     try:
         for root, dirs, files in os.walk(attachments_dir, topdown=False):
             for filename in files:
-                file_path = os.path.normpath(os.path.join(root, filename))
+                file_path = os.path.normpath(os.path.abspath(os.path.join(root, filename)))
                 
                 # If not tracked in DB, it is an orphan
-                if file_path not in db_file_paths:
+                if file_path not in all_valid_paths:
                     try:
                         file_size = os.path.getsize(file_path)
                         os.remove(file_path)
@@ -100,3 +117,56 @@ def perform_orphan_cleanup(db: Session) -> dict:
         "deleted_files": deleted_files,
         "freed_bytes": freed_bytes
     }
+
+def cleanup_canvas_orphans(db: Session) -> dict:
+    """
+    清理未被 CanvasInstance 记录引用的画布图片文件。
+    扫描 uploads/canvases/ 目录，删除孤立文件并返回删除列表及释放的字节数。
+    """
+    canvases_dir = os.path.join(settings.upload_dir, "canvases")
+    if not os.path.exists(canvases_dir):
+        return {"deleted_files": [], "freed_bytes": 0}
+
+    # 获取数据库中所有画布实例引用的文件路径
+    canvas_instances = db.query(CanvasInstance).all()
+    valid_paths = set()
+    upload_root = os.path.abspath(settings.upload_dir)
+    for ci in canvas_instances:
+        if ci.image_url:
+            if ci.image_url.startswith("/static/uploads/"):
+                rel_path = ci.image_url.replace("/static/uploads/", "", 1)
+                valid_paths.add(os.path.normpath(os.path.abspath(os.path.join(upload_root, rel_path))))
+            elif ci.image_url.startswith("/static/"):
+                rel_path = ci.image_url.replace("/static/", "", 1)
+                static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+                valid_paths.add(os.path.normpath(os.path.abspath(os.path.join(static_dir, rel_path))))
+
+    deleted_files = []
+    freed_bytes = 0
+
+    try:
+        for root, dirs, files in os.walk(canvases_dir, topdown=False):
+            for filename in files:
+                file_path = os.path.normpath(os.path.abspath(os.path.join(root, filename)))
+                if file_path not in valid_paths:
+                    try:
+                        file_size = os.path.getsize(file_path)
+                        os.remove(file_path)
+                        rel_name = os.path.relpath(file_path, canvases_dir)
+                        deleted_files.append(rel_name)
+                        freed_bytes += file_size
+                        logger.info(f"Cleanup: Removed orphan canvas file {rel_name} ({file_size} bytes)")
+                    except Exception as e:
+                        logger.error(f"Cleanup: Failed to remove orphan canvas file {file_path}: {e}")
+            # 清理空目录
+            if root != canvases_dir and os.path.exists(root):
+                try:
+                    if not os.listdir(root):
+                        os.rmdir(root)
+                        logger.info(f"Cleanup: Removed empty canvas directory {root}")
+                except Exception as dir_e:
+                    logger.debug(f"Cleanup: Canvas directory {root} not empty or cannot remove: {dir_e}")
+    except Exception as e:
+        logger.error(f"Cleanup: Canvas directory scan failed: {e}")
+
+    return {"deleted_files": deleted_files, "freed_bytes": freed_bytes}

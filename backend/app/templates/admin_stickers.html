@@ -1,5 +1,5 @@
 {% extends "admin_base.html" %}
-{% block title %}自定义贴纸管理 - 控制台 - DinoRoar{% endblock %}
+{% block title %}贴纸管理 - 控制台 - DinoRoar{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css">
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
@@ -9,7 +9,7 @@
 <div style="display: flex; flex-direction: column; gap: 2px;">
     <header style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
         <div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0;">🎨 自定义贴纸管理</h2>
+            <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0;">🎨 贴纸管理</h2>
         </div>
         <div style="display: flex; gap: 12px; align-items: center;">
             <input type="text" id="searchSeriesInput" class="form-control" placeholder="🔍 搜索筛选..." style="width: 150px; height: 38px; margin: 0; font-size: 0.82rem;" oninput="handleSearch()">
@@ -87,12 +87,22 @@
         <div style="display: flex; gap: 25px; margin-top: 15px; flex-wrap: wrap;">
             <div style="flex: 1.1; min-width: 310px; display: flex; flex-direction: column; gap: 12px;">
                 <div class="form-group" style="margin: 0;">
-                    <label class="form-label">选择贴纸原始图片</label>
-                    <input class="form-control" type="file" id="stickerFile" accept="image/*" style="padding: 6px 12px;" onchange="handleFileSelect(event)">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <label class="form-label" style="margin: 0;">选择贴纸原始图片</label>
+                        <span class="clipboard-tip-icon" title="由于浏览器安全策略限制，直接从剪贴板读取仅在 HTTPS/localhost 下可用。但您依然可以直接在此弹窗内通过键盘 Ctrl + V 粘贴图片！" style="cursor: help; font-size: 0.85rem; color: var(--text-muted);">❓</span>
+                    </div>
+                    <input class="form-control" type="file" id="stickerFile" accept="image/*" style="padding: 6px 12px; margin-top: 6px;" onchange="handleFileSelect(event)">
                 </div>
-                <div id="cropContainer" style="display: none;">
+                <div id="cropContainer" style="display: block;">
                     <label class="form-label" style="margin-top: 5px;">裁剪控制 (1:1 正方形)</label>
-                    <div class="crop-wrapper"><img id="cropImage" src=""></div>
+                    <div class="crop-wrapper" id="stickerCropWrapper" style="height: 260px; border: 2px dashed rgba(255,255,255,0.08); border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.01); position: relative; overflow: hidden;">
+                        <!-- 占位元素 -->
+                        <div id="stickerCropPlaceholder" style="display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted); text-align: center; pointer-events: none;">
+                            <span style="font-size: 2rem; opacity: 0.5;">🎨</span>
+                            <span style="font-size: 0.78rem; font-weight: 500;">拖拽/粘贴图片或选择本地文件</span>
+                        </div>
+                        <img id="cropImage" src="" style="display: none; max-height: 100%; max-width: 100%;">
+                    </div>
                 </div>
             </div>
             <div style="flex: 1; min-width: 270px; display: flex; flex-direction: column; gap: 12px;">
@@ -229,5 +239,8 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/admin_stickers.js"></script>
+<script src="/static/js/admin_stickers_api.js?v=202608120025"></script>
+<script src="/static/js/admin_stickers_lightbox.js?v=202608120025"></script>
+<script src="/static/js/admin_stickers_drag.js?v=202608120025"></script>
+<script src="/static/js/admin_stickers.js?v=202608120025"></script>
 {% endblock %}

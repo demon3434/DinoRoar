@@ -1,6 +1,7 @@
 import datetime
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 # Token Schemas
 class Token(BaseModel):
@@ -86,6 +87,13 @@ class PersonBase(BaseModel):
     is_temporary: bool = False
     is_deleted: bool = False
 
+    @model_validator(mode='after')
+    def check_category(self) -> 'PersonBase':
+        if not self.is_deleted and not self.category_uuid:
+            raise ValueError("All active persons must belong to a category")
+        return self
+
+
 class PersonCreate(PersonBase):
     pass
 
@@ -126,6 +134,8 @@ class LogBase(BaseModel):
     updated_at: Optional[datetime.datetime] = None
     version: int = 1
     person_uuids: List[str] = []
+    canvas_instance_id: Optional[int] = None
+    canvas_aspect_ratio: str = "2:1"
 
 class LogCreate(LogBase):
     pass
@@ -137,6 +147,7 @@ class LogResponse(LogBase):
     is_deleted: bool
     attachments: List[AttachmentResponse] = []
     person_uuids: List[str] = []
+    canvas_image_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -235,6 +246,54 @@ class StickerImportConfirmRequest(BaseModel):
 
 class StickerBatchDeleteRequest(BaseModel):
     sticker_ids: List[int]
+
+
+# Canvas Schemas
+class CanvasInstanceResponse(BaseModel):
+    id: int
+    canvas_set_id: int
+    aspect_ratio: str
+    image_url: str
+    width: int
+    height: int
+    is_active: bool = True
+    is_deleted: bool = False
+    created_at: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CanvasSetResponse(BaseModel):
+    id: int
+    series_id: Optional[int] = None
+    name: str
+    description: Optional[str] = None
+    sort_order: int
+    exchange_price: int
+    is_active: bool = True
+    is_deleted: bool = False
+    created_at: datetime.datetime
+    instances: List[CanvasInstanceResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CanvasSeriesResponse(BaseModel):
+    id: int
+    name: str
+    sort_order: int
+    is_active: bool = True
+    is_deleted: bool = False
+    created_at: datetime.datetime
+    sets: List[CanvasSetResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CanvasSyncPayload(BaseModel):
+    canvas_inventory: str = ""
+    egg_energy: int
+
 
 
 

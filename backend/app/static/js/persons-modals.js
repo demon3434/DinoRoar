@@ -84,7 +84,7 @@ function openAddPersonModal() {
     document.getElementById('personModalRel').value = "";
     
     const select = document.getElementById('personModalCategory');
-    select.innerHTML = '<option value="unclassified">未分类</option>';
+    select.innerHTML = '';
     globalCategories.filter(c => !c.is_deleted).forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.uuid;
@@ -107,14 +107,32 @@ function openEditPersonModal(person) {
     document.getElementById('personModalRel').value = person.relationship;
 
     const select = document.getElementById('personModalCategory');
-    select.innerHTML = '<option value="unclassified">未分类</option>';
-    globalCategories.filter(c => !c.is_deleted).forEach(c => {
+    select.innerHTML = '';
+    
+    const activeCategories = globalCategories.filter(c => !c.is_deleted);
+    activeCategories.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.uuid;
         opt.textContent = c.name;
         select.appendChild(opt);
     });
-    select.value = person.category_uuid || 'unclassified';
+
+    if (person.category_uuid) {
+        const existingCat = globalCategories.find(c => c.uuid === person.category_uuid);
+        if (existingCat && existingCat.is_deleted) {
+            const opt = document.createElement('option');
+            opt.value = existingCat.uuid;
+            opt.textContent = existingCat.name + ' (已停用)';
+            select.appendChild(opt);
+        }
+        select.value = person.category_uuid;
+    } else {
+        if (activeCategories.length > 0) {
+            select.value = activeCategories[0].uuid;
+        } else {
+            select.value = '';
+        }
+    }
 
     const colorVal = person.color_tag || 'red';
     const radio = document.querySelector(`input[name="personModalColor"][value="${colorVal}"]`);
@@ -159,6 +177,18 @@ async function savePersonModal() {
         return;
     }
 
+    const activeCategories = globalCategories.filter(c => !c.is_deleted);
+    const isEditingWithDisabledCat = uuid && globalPersons.find(p => p.uuid === uuid)?.category_uuid === catSelectVal;
+    if (activeCategories.length === 0 && !isEditingWithDisabledCat) {
+        alert("请先新建分类！所有正式关系人必须落座分类。");
+        return;
+    }
+
+    if (!catSelectVal || catSelectVal === 'unclassified') {
+        alert("请选择一个有效的分类！");
+        return;
+    }
+
     const existing = globalPersons.find(p => p.uuid === uuid);
 
     const personObj = {
@@ -166,7 +196,7 @@ async function savePersonModal() {
         name: name,
         abbreviation: abbr.toUpperCase(),
         relationship: rel || '朋友',
-        category_uuid: catSelectVal === 'unclassified' ? null : catSelectVal,
+        category_uuid: catSelectVal,
         color_tag: colorVal,
         sort_order: existing ? (existing.sort_order || 0) : 99,
         is_temporary: false

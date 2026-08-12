@@ -87,7 +87,7 @@ def remove_background_and_shadow(input_path, output_path, tolerance: int = 60):
         resized_img = img.resize((256, 256), Image.Resampling.LANCZOS)
         output_dir = Path(output_path).parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        resized_img.save(output_path, "PNG")
+        resized_img.save(output_path, "PNG", optimize=True)
         logger.info(f"Successfully processed clean white bg transparent sticker: {output_path}")
         return True
     except Exception as e:

@@ -19,6 +19,13 @@
 <body>
     <!-- Token verification & Theme recovery BEFORE rendering elements to prevent flash -->
     <script>
+        // 如果 URL 中带有 token，自动保存到 localStorage 供免密鉴权使用
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+            localStorage.setItem('token', urlToken);
+        }
+
         const token = localStorage.getItem('token');
         if (!token) {
             window.location.href = '/login';
@@ -101,9 +108,9 @@
                     <span class="sidebar-text">查看日记</span>
                 </a>
  
-                <a href="/stickers" class="menu-item {% if active_tab == 'stickers' %}active{% endif %}" id="menu-stickers-tab" style="text-decoration: none; color: inherit;">
-                    <span>🎨</span>
-                    <span class="sidebar-text">我的贴纸</span>
+                <a href="/mall" class="menu-item {% if active_tab == 'mall' %}active{% endif %}" id="menu-mall-tab" style="text-decoration: none; color: inherit;">
+                    <span>🛍️</span>
+                    <span class="sidebar-text">手账商城</span>
                 </a>
                 
                 <div class="menu-item {% if active_tab.startswith('settings') %}active{% endif %}" onclick="toggleSubmenu('settings-submenu')" id="menu-settings-tab">

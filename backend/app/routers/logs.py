@@ -89,6 +89,9 @@ async def list_logs(
         .options(selectinload(Log.attachments), selectinload(Log.persons))\
         .all()
 
+    from ..services.log_service import populate_log_canvas_details
+    populate_log_canvas_details(db, items)
+
     return {
         "total": total,
         "page": page,
@@ -109,6 +112,10 @@ async def get_log_detail(
     ).options(selectinload(Log.attachments), selectinload(Log.persons)).first()
     if not log:
         raise HTTPException(status_code=404, detail="Log not found")
+        
+    from ..services.log_service import populate_log_canvas_details
+    populate_log_canvas_details(db, [log])
+    
     return log
 
 @router.get("/stats/overview")

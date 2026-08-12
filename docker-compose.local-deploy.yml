@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # DinoRoar 主后端服务 (本地测试版)
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: dinoroar-app:local
+    container_name: dinoroar-app
+    restart: unless-stopped
+    ports:
+      # 宿主机 HTTP & mDNS UDP 端口映射
+      - "${APP_HTTP_PORT:-8080}:8080"
+      - "${APP_UDP_PORT:-8090}:8090/udp"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - WEB_PORT=8080
+      - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
+      - STT_API_URL=http://stt:18000/api/transcribe
+      - UPLOAD_DIR=/workspace/uploads
+      - DATA_DIR=/workspace/data
+    volumes:
+      # 数据库与上传文件持久化挂载 (显式使用194物理路径)
+      - /opt/docker/dinoroar/data:/workspace/data
+      - /mnt/sata/dinoroar/uploads:/workspace/uploads
+      # 挂载宿主机时区文件，保证日志与日记时间一致
+      - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
+    networks:
+      - dinoroar_net
+
+  # DinoRoar STT 语音识别服务 (本地测试版)
+  stt:
+    build:
+      context: ./stt
+      dockerfile: Dockerfile
+    image: dinoroar-stt:local
+    container_name: dinoroar-stt
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      # 语音识别模型缓存挂载 (显式使用194物理路径)
+      - /opt/docker/dinoroar/stt_models:/app/models
+      # 挂载宿主机时区文件
+      - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-3}"
+    networks:
+      - dinoroar_net
+
+networks:
+  dinoroar_net:
+    name: dinoroar_net
+    driver: bridge

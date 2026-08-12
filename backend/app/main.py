@@ -73,69 +73,69 @@ async def lifespan(app: FastAPI):
         # Seed default admin user and run quick migrations
         db = SessionLocal()
         try:
-            # Seed DinoConfigs if empty
-            seed_initial_dino_configs(db)
-            
-            # Migration check: Create indexes if missing
             from sqlalchemy import text
-            try:
-                db.execute(text("CREATE INDEX IF NOT EXISTS idx_logs_user_deleted_incident ON logs(user_id, is_deleted, incident_date)"))
-                db.execute(text("CREATE INDEX IF NOT EXISTS idx_persons_user_deleted ON persons(user_id, is_deleted)"))
-                db.execute(text("CREATE INDEX IF NOT EXISTS idx_categories_user_deleted ON person_categories(user_id, is_deleted)"))
-                db.execute(text("CREATE INDEX IF NOT EXISTS idx_attachments_log_id ON attachments(log_id)"))
-                db.execute(text("CREATE INDEX IF NOT EXISTS idx_log_person_association_person_uuid ON log_person_association(person_uuid)"))
-                db.commit()
-                logger.info("Database Migration: Indexes verified/created successfully.")
-            except Exception as idx_err:
-                db.rollback()
-                logger.error(f"Database Migration: Failed to create indexes: {idx_err}")
 
-            # Migration check: Add nickname column if missing
+            # 1. Migration check: Add nickname column if missing
             try:
                 db.execute(text("SELECT nickname FROM users LIMIT 1"))
             except Exception:
+                db.rollback()
                 logger.info("Database Migration: Adding missing 'nickname' column to 'users' table...")
                 db.execute(text("ALTER TABLE users ADD COLUMN nickname VARCHAR"))
                 db.commit()
                 logger.info("Database Migration: 'nickname' column added successfully.")
             
-            # Migration check: Add theme column if missing
+            # 2. Migration check: Add theme column if missing
             try:
                 db.execute(text("SELECT theme FROM users LIMIT 1"))
             except Exception:
+                db.rollback()
                 logger.info("Database Migration: Adding missing 'theme' column to 'users' table...")
                 db.execute(text("ALTER TABLE users ADD COLUMN theme VARCHAR DEFAULT 'dark-neon'"))
                 db.commit()
                 logger.info("Database Migration: 'theme' column added successfully.")
 
-            # Migration check: Add is_active column if missing
+            # 3. Migration check: Add is_active column if missing
             try:
                 db.execute(text("SELECT is_active FROM users LIMIT 1"))
             except Exception:
+                db.rollback()
                 logger.info("Database Migration: Adding missing 'is_active' column to 'users' table...")
                 db.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1"))
                 db.commit()
                 logger.info("Database Migration: 'is_active' column added successfully.")
 
-            # Migration check: Add sticker_inventory column to users if missing
+            # 4. Migration check: Add sticker_inventory column to users if missing
             try:
                 db.execute(text("SELECT sticker_inventory FROM users LIMIT 1"))
             except Exception:
+                db.rollback()
                 logger.info("Database Migration: Adding missing 'sticker_inventory' column to 'users' table...")
                 db.execute(text("ALTER TABLE users ADD COLUMN sticker_inventory VARCHAR DEFAULT ''"))
                 db.commit()
                 logger.info("Database Migration: 'sticker_inventory' column added successfully.")
 
-            # Migration check: Add egg_energy column to users if missing
+            # 5. Migration check: Add egg_energy column to users if missing
             try:
                 db.execute(text("SELECT egg_energy FROM users LIMIT 1"))
             except Exception:
+                db.rollback()
                 logger.info("Database Migration: Adding missing 'egg_energy' column to 'users' table...")
                 db.execute(text("ALTER TABLE users ADD COLUMN egg_energy INTEGER DEFAULT 0"))
                 db.commit()
                 logger.info("Database Migration: 'egg_energy' column added successfully.")
 
-            # Migration check: Add missing columns to sticker_configs if missing
+            # 6. Migration check: Add canvas_inventory column to users if missing
+            try:
+                db.execute(text("SELECT canvas_inventory FROM users LIMIT 1"))
+            except Exception:
+                db.rollback()
+                logger.info("Database Migration: Adding missing 'canvas_inventory' column to 'users' table...")
+                db.execute(text("ALTER TABLE users ADD COLUMN canvas_inventory VARCHAR DEFAULT ''"))
+                db.commit()
+                logger.info("Database Migration: 'canvas_inventory' column added successfully.")
+
+            # 7. Migration check: Add missing columns to sticker_configs if missing
             try:
                 db.execute(text("SELECT series_id FROM sticker_configs LIMIT 1"))
             except Exception:
@@ -171,13 +171,29 @@ async def lifespan(app: FastAPI):
                 db.execute(text("ALTER TABLE sticker_configs ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
                 db.commit()
 
-            # Migration check: Add missing columns to sticker_series if missing
+            # 8. Migration check: Add missing columns to sticker_series if missing
             try:
                 db.execute(text("SELECT created_at FROM sticker_series LIMIT 1"))
             except Exception:
                 db.rollback()
                 db.execute(text("ALTER TABLE sticker_series ADD COLUMN created_at DATETIME DEFAULT '2026-07-17 00:00:00'"))
                 db.commit()
+
+            # 9. Migration check: Create indexes if missing
+            try:
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_logs_user_deleted_incident ON logs(user_id, is_deleted, incident_date)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_persons_user_deleted ON persons(user_id, is_deleted)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_categories_user_deleted ON person_categories(user_id, is_deleted)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_attachments_log_id ON attachments(log_id)"))
+                db.execute(text("CREATE INDEX IF NOT EXISTS idx_log_person_association_person_uuid ON log_person_association(person_uuid)"))
+                db.commit()
+                logger.info("Database Migration: Indexes verified/created successfully.")
+            except Exception as idx_err:
+                db.rollback()
+                logger.error(f"Database Migration: Failed to create indexes: {idx_err}")
+
+            # 10. Seed DinoConfigs if empty
+            seed_initial_dino_configs(db)
                 
             try:
                 db.execute(text("SELECT is_deleted FROM sticker_series LIMIT 1"))
@@ -297,6 +313,103 @@ async def lifespan(app: FastAPI):
                     logger.info(f"Database Migration: Successfully migrated {migration_res['migrated_count']} legacy sticker files to series subfolders.")
             except Exception as seed_err:
                 logger.error(f"Database: Failed to seed or self-heal sticker configs: {seed_err}")
+
+            # Seed and self-heal default canvas configs (Series: "恐龙世界", Set: "森林家园")
+            try:
+                logger.info("Database: Verifying and seeding default canvas configs...")
+                from pathlib import Path
+                import shutil
+                base_static = Path(__file__).resolve().parent / "static"
+                upload_root = Path(settings.upload_dir)
+
+                # 1. 确保分类 "恐龙世界" 存在
+                series = db.query(models.CanvasSeries).filter(models.CanvasSeries.name == "恐龙世界", models.CanvasSeries.is_deleted == False).first()
+                if not series:
+                    logger.info("Database: Seeding default canvas series '恐龙世界'...")
+                    series = models.CanvasSeries(name="恐龙世界", sort_order=1, is_active=True, is_deleted=False)
+                    db.add(series)
+                    db.commit()
+                    db.refresh(series)
+
+                series_id = series.id
+
+                # 2. 确保套件 "森林家园" 存在（主键固定为 3001）
+                canvas_set = db.query(models.CanvasSet).filter(models.CanvasSet.id == 3001).first()
+                if not canvas_set:
+                    logger.info("Database: Seeding default canvas set '森林家园' with ID 3001...")
+                    canvas_set = models.CanvasSet(
+                        id=3001,
+                        series_id=series_id,
+                        name="森林家园",
+                        description="远古绿野与清凉湖泊的森林家园",
+                        sort_order=1,
+                        exchange_price=50,
+                        is_active=True,
+                        is_deleted=False
+                    )
+                    db.add(canvas_set)
+                    db.commit()
+                    db.refresh(canvas_set)
+
+                # 3. 复制对应的图片文件到 uploads 对应目录下
+                canvases_dir = upload_root / "canvases" / f"series_{series_id}"
+                canvases_dir.mkdir(parents=True, exist_ok=True)
+
+                canvas_ratios = [
+                    ("16:9", "canvas_fallback_16_9.jpg", "canvas_3001_16_9.jpg", 1440, 810, 4001),
+                    ("4:3", "canvas_fallback_4_3.jpg", "canvas_3001_4_3.jpg", 1440, 1080, 4002),
+                    ("1:1", "canvas_fallback_1_1.jpg", "canvas_3001_1_1.jpg", 1440, 1440, 4003),
+                    ("2:1", "canvas_fallback_2_1.jpg", "canvas_3001_2_1.jpg", 1440, 720, 4004)
+                ]
+
+                for ratio, src_name, dest_name, w, h, inst_id in canvas_ratios:
+                    src_file = base_static / "images" / "canvases" / src_name
+                    dest_file = canvases_dir / dest_name
+                    if src_file.exists():
+                        shutil.copy2(src_file, dest_file)
+                        logger.info(f"Database: Copied fallback asset {src_name} to uploads: {dest_name}")
+                    else:
+                        logger.warning(f"Database: Builtin canvas asset {src_name} not found!")
+
+                    # 4. 插入或更新对应的实例数据 (4001 - 4004)
+                    instance = db.query(models.CanvasInstance).filter(models.CanvasInstance.id == inst_id).first()
+                    rel_url = f"/static/uploads/canvases/series_{series_id}/{dest_name}"
+                    if not instance:
+                        logger.info(f"Database: Seeding canvas instance for {ratio}...")
+                        instance = models.CanvasInstance(
+                            id=inst_id,
+                            canvas_set_id=3001,
+                            aspect_ratio=ratio,
+                            image_url=rel_url,
+                            width=w,
+                            height=h,
+                            is_active=True,
+                            is_deleted=False
+                        )
+                        db.add(instance)
+                    else:
+                        instance.canvas_set_id = 3001
+                        instance.aspect_ratio = ratio
+                        instance.image_url = rel_url
+                        instance.width = w
+                        instance.height = h
+                        instance.is_deleted = False
+                        db.add(instance)
+                db.commit()
+
+                # 5. 直接赠送这套画布给所有已存在的用户（防漏）
+                for u in db.query(models.User).all():
+                    inv = u.canvas_inventory or ""
+                    parts = [p.strip() for p in inv.split(",") if p.strip()]
+                    if "3001" not in parts:
+                        parts.append("3001")
+                        u.canvas_inventory = ",".join(parts)
+                        db.add(u)
+                db.commit()
+                logger.info("Database: Seeding of default canvas configs completed successfully.")
+            except Exception as canvas_seed_err:
+                db.rollback()
+                logger.error(f"Database: Failed to seed default canvas configs: {canvas_seed_err}")
 
             # Migration check: Add updated_at column to logs if missing
             try:
@@ -433,6 +546,13 @@ async def lifespan(app: FastAPI):
 
     # Start mDNS Broadcaster
     get_mdns_settings_and_start()
+
+    # Start background task to compress historical uploads (lossless optimization)
+    try:
+        from .services.compress_historical import start_historical_compression
+        start_historical_compression()
+    except Exception as compress_err:
+        logger.error(f"Error starting historical image compression: {compress_err}")
     
     yield
     
@@ -447,7 +567,7 @@ app = FastAPI(
 )
 
 # Register Routers
-from .routers import auth, logs, settings as settings_router, attachments, admin_users, pages, persons, categories, dino_config, stickers, stt
+from .routers import auth, logs, settings as settings_router, attachments, admin_users, pages, persons, categories, dino_config, stickers, stt, canvases
 app.include_router(auth.router)
 app.include_router(logs.router)
 app.include_router(settings_router.router)
@@ -459,6 +579,8 @@ app.include_router(categories.router)
 app.include_router(dino_config.router)
 app.include_router(stickers.router)
 app.include_router(stt.router)
+app.include_router(canvases.router)
+
 
 # Mount Static Files
 from pathlib import Path

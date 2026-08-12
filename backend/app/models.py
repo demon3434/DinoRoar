@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index, UniqueConstraint
 from sqlalchemy.orm import relationship as orm_relationship
 from .database import Base
 
@@ -25,6 +25,7 @@ class User(Base):
     
     # Cloud sync assets for sticker gameplay
     sticker_inventory = Column(String, default="", nullable=False)
+    canvas_inventory = Column(String, default="3001", nullable=False) # 存储已解锁/购买的画布套 ID，如 "3001,3002"
     egg_energy = Column(Integer, default=100, nullable=False)
 
     # Relationships
@@ -185,6 +186,71 @@ class StickerConfig(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, nullable=False, default=False)
+
+
+class CanvasSeries(Base):
+    """
+    画布系列表：对背景画布套进行大分类
+    """
+    __tablename__ = "canvas_series"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)  # 系列间的显示排序
+    is_active = Column(Boolean, nullable=False, default=True)  # 启用状态
+    is_deleted = Column(Boolean, nullable=False, default=False)  # 软删除
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class CanvasSet(Base):
+    """
+    画布套/商品表：商城的兑换单元（如 3001 '侏罗纪森林'）
+    """
+    __tablename__ = "canvas_sets"
+
+    id = Column(Integer, primary_key=True, index=True)  # 自增主键，从 3001 起步
+    series_id = Column(Integer, ForeignKey("canvas_series.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)  # 同系列内的展示排序
+    exchange_price = Column(Integer, nullable=False, default=50)  # 兑换所需蛋能量
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class CanvasInstance(Base):
+    """
+    画布图片实例表：保存特定比例画布裁剪后物理图片的真实信息
+    """
+    __tablename__ = "canvas_instances"
+
+    id = Column(Integer, primary_key=True, index=True)  # 自增主键，从 4001 起步
+    canvas_set_id = Column(Integer, ForeignKey("canvas_sets.id", ondelete="CASCADE"), nullable=False)
+    aspect_ratio = Column(String, nullable=False)  # 枚举："16:9", "4:3", "1:1", "2:1"
+    image_url = Column(String, nullable=False)  # 静态图片路径
+    width = Column(Integer, nullable=False, default=1440)
+    height = Column(Integer, nullable=False)  # 基于宽高比计算的高度
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    # 联合唯一性约束，防止同套画布下重复上传相同比例的图片
+    __table_args__ = (
+        UniqueConstraint("canvas_set_id", "aspect_ratio", name="uq_canvas_set_ratio"),
+    )
+
+
+class LogCanvas(Base):
+    """
+    日记画布关联表：维护日记与特定背景画布实例的关系
+    """
+    __tablename__ = "log_canvases"
+
+    log_uuid = Column(String, ForeignKey("logs.uuid", ondelete="CASCADE"), primary_key=True)
+    canvas_instance_id = Column(Integer, ForeignKey("canvas_instances.id", ondelete="SET NULL"), nullable=True)
+    canvas_aspect_ratio = Column(String, nullable=False, default="2:1")  # "16:9", "4:3", "1:1", "2:1"
+
 
 
 

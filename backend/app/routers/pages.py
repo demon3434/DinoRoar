@@ -69,10 +69,23 @@ async def get_diary_detail_page(request: Request):
 
 @router.get("/stickers", response_class=HTMLResponse)
 async def get_stickers_page(request: Request):
-    return templates.TemplateResponse(request, "stickers.html", {"active_tab": "stickers"})
+    return templates.TemplateResponse(request, "stickers.html", {"active_tab": "mall"})
 
 @router.get("/admin/stickers", response_class=HTMLResponse)
 async def get_admin_stickers_page(request: Request):
     return templates.TemplateResponse(request, "admin_stickers.html", {"active_tab": "admin-stickers-list"})
+
+@router.get("/mall", response_class=HTMLResponse)
+async def get_mall_page(request: Request):
+    return templates.TemplateResponse(request, "mall.html", {"active_tab": "mall"})
+
+@router.get("/canvases", response_class=HTMLResponse)
+async def get_canvases_page(request: Request):
+    return templates.TemplateResponse(request, "canvases.html", {"active_tab": "mall"})
+
+@router.get("/admin/canvases", response_class=HTMLResponse)
+async def get_admin_canvases_page(request: Request):
+    return templates.TemplateResponse(request, "admin_canvases.html", {"active_tab": "admin-canvases-list"})
+
 
 

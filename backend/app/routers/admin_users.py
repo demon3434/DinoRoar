@@ -7,7 +7,8 @@ from ..database import get_db
 from ..models import User
 from ..schemas import UserResponse, UserCreate, UserResetLock
 from ..auth import get_current_admin, get_password_hash
-from ..services.cleanup import perform_orphan_cleanup
+from ..services.cleanup import perform_orphan_cleanup, cleanup_canvas_orphans, cleanup_running
+from ..services.stickers.storage import cleanup_sticker_orphans
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Management"])
 
@@ -228,17 +229,72 @@ async def reset_user_lock_pattern(
     user.lock_reset_flag = "default_requested"
     db.commit()
     return {"message": f"Mobile pattern lock reset flag set to default_requested and pattern updated for {user.username}"}
-
 @router.post("/cleanup", status_code=status.HTTP_200_OK)
 async def run_cleanup(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     """
-    Triggers the manual scan and deletion of orphaned/broken attachments.
+    Triggers the manual scan and deletion of orphaned/broken attachments (legacy endpoint).
     """
-    result = perform_orphan_cleanup(db)
+    global cleanup_running
+    if cleanup_running:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="系统清理任务已在进行中，请稍后再试")
+    try:
+        cleanup_running = True
+        result = perform_orphan_cleanup(db)
+    finally:
+        cleanup_running = False
     return result
+
+@router.post("/cleanup_stickers", status_code=status.HTTP_200_OK)
+async def cleanup_stickers(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Clean up orphan sticker images."""
+    global cleanup_running
+    if cleanup_running:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="系统清理任务已在进行中，请稍后再试")
+    try:
+        cleanup_running = True
+        result = cleanup_sticker_orphans(db)
+    finally:
+        cleanup_running = False
+    return result
+
+@router.post("/cleanup_canvases", status_code=status.HTTP_200_OK)
+async def cleanup_canvases(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Clean up orphan canvas images."""
+    global cleanup_running
+    if cleanup_running:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="系统清理任务已在进行中，请稍后再试")
+    try:
+        cleanup_running = True
+        result = cleanup_canvas_orphans(db)
+    finally:
+        cleanup_running = False
+    return result
+
+@router.post("/cleanup_attachments", status_code=status.HTTP_200_OK)
+async def cleanup_attachments(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Clean up orphan attachment files (alias for legacy endpoint)."""
+    global cleanup_running
+    if cleanup_running:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="系统清理任务已在进行中，请稍后再试")
+    try:
+        cleanup_running = True
+        result = perform_orphan_cleanup(db)
+    finally:
+        cleanup_running = False
+    return result
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

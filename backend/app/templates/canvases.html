@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 画布商城{% endblock %}
+
+{% block head %}
+<style>
+    .canvases-layout {
+        display: flex;
+        gap: 25px;
+        max-width: 1200px;
+        margin: 0 auto;
+        min-height: calc(100vh - 120px);
+        align-items: stretch;
+    }
+    
+    /* 1. 左侧系列分类侧边栏 */
+    .series-sidebar {
+        width: 240px;
+        flex-shrink: 0;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 20px 15px;
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        min-height: calc(100vh - 75px);
+        max-height: calc(100vh - 75px);
+        position: sticky;
+        top: 25px;
+    }
+    
+    .sidebar-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-main);
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 5px;
+    }
+    
+    .series-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        flex: 1;
+    }
+    
+    .series-nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .series-nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-main);
+        border-color: var(--card-border);
+    }
+    
+    .series-nav-item.active {
+        background: linear-gradient(135deg, #a78bfa, #c084fc);
+        color: #111;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(192, 132, 252, 0.25);
+    }
+    
+    .series-badge {
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        font-family: monospace;
+    }
+    
+    .series-nav-item.active .series-badge {
+        background: rgba(0, 0, 0, 0.15);
+        color: #111;
+    }
+    
+    /* 2. 右侧画布主展现区 */
+    .canvas-main-panel {
+        flex: 1;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 25px 30px;
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: calc(100vh - 75px);
+    }
+    
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--card-border);
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .panel-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+    }
+    
+    .canvases-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 30px;
+        margin-top: 10px;
+        flex: 1;
+        align-content: start;
+    }
+    
+    .canvas-card {
+        border-radius: 20px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.01);
+        border: 1px solid var(--card-border);
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .canvas-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(192, 132, 252, 0.35);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    .canvas-preview-box {
+        position: relative;
+        width: 100%;
+        height: 180px;
+        background-color: #121824;
+        background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 0);
+        background-size: 16px 16px;
+        overflow: hidden;
+        border-bottom: 1px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .canvas-preview-img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: opacity 0.3s ease;
+    }
+
+    .ratio-switcher {
+        display: flex;
+        justify-content: space-around;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid var(--card-border);
+        padding: 6px 8px;
+        gap: 6px;
+    }
+
+    .ratio-btn {
+        flex: 1;
+        text-align: center;
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: var(--text-muted);
+        padding: 5px 2px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        user-select: none;
+    }
+
+    .ratio-btn:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .ratio-btn.active {
+        color: #111;
+        background: linear-gradient(135deg, #a78bfa, #c084fc);
+        box-shadow: 0 2px 8px rgba(192, 132, 252, 0.25);
+    }
+
+    .canvas-info {
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .canvas-name {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-main);
+        margin-bottom: 4px;
+    }
+
+    .canvas-desc {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+        margin-bottom: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+    }
+
+    .canvas-action-area {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .canvas-price {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #60a5fa;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .canvas-btn {
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .canvas-btn.exchange {
+        background: linear-gradient(135deg, #a78bfa, #c084fc);
+        color: #111;
+        box-shadow: 0 4px 10px rgba(192, 132, 252, 0.3);
+    }
+
+    .canvas-btn.exchange:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(192, 132, 252, 0.4);
+    }
+
+    .canvas-btn.owned {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--card-border);
+        color: var(--text-muted);
+        cursor: default;
+    }
+
+    .canvas-btn.locked {
+        background: rgba(255, 255, 255, 0.02);
+        border-color: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.15);
+        cursor: not-allowed;
+    }
+
+    .rules-card {
+        margin-top: 30px;
+        background: rgba(255, 255, 255, 0.01);
+        border-left: 4px solid var(--accent-cloudy);
+        padding: 12px 18px;
+        border-radius: 0 12px 12px 0;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+        .canvases-layout {
+            flex-direction: column;
+        }
+        .series-sidebar {
+            width: 100%;
+            min-height: auto;
+            max-height: 180px;
+            position: static;
+        }
+    }
+    
+    /* Lightbox Styles */
+    .lightbox-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.9);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        backdrop-filter: blur(4px);
+    }
+    
+    .lightbox-toolbar {
+        height: 48px;
+        background: rgba(30, 41, 59, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        color: #fff;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        flex-shrink: 0;
+    }
+    
+    .lightbox-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: #f1f5f9;
+    }
+    
+    .zoom-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .zoom-controls button {
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        color: #fff;
+        border-radius: 4px;
+        padding: 4px 10px;
+        cursor: pointer;
+        font-size: 13px;
+    }
+    
+    .zoom-controls button:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .zoom-level {
+        font-size: 12px;
+        color: #94a3b8;
+        min-width: 42px;
+        text-align: center;
+    }
+    
+    .close-btn {
+        background: transparent;
+        border: none;
+        color: #cbd5e1;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+    }
+    
+    .close-btn:hover {
+        color: #fff;
+    }
+    
+    .lightbox-content {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        user-select: none;
+    }
+    
+    .lightbox-image {
+        max-width: 90vw;
+        max-height: 85vh;
+        object-fit: contain;
+        transition: transform 0.05s ease-out;
+        transform-origin: center center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="canvases-layout">
+    <!-- 1. 左侧系列分类侧边栏 -->
+    <div class="series-sidebar">
+        <div class="sidebar-title">
+            <span>📂</span> 画布系列
+        </div>
+        <div class="series-nav-list" id="seriesNavList">
+            <!-- JS 动态灌入系列列表 -->
+        </div>
+    </div>
+
+    <!-- 2. 右侧画布主面板 -->
+    <div class="canvas-main-panel">
+        <div class="panel-header">
+            <h2 class="panel-title" id="panelTitle">
+                <span>🖼️</span> 画布商城
+            </h2>
+        </div>
+
+        <!-- 画布网格区 -->
+        <div class="canvases-grid" id="canvasesGrid">
+            <!-- JS 动态灌入画布套 -->
+        </div>
+
+        <div class="rules-card">
+            <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">💡 提示：</strong>
+            一次购买将获得本套画布下的**所有宽高比图片**的永久所有权！购买后可在手账编辑器中选用，打造比例更丰富、精美的日记背景。
+        </div>
+    </div>
+</div>
+
+    <!-- 3. 画布大图查看 Lightbox 弹出层 -->
+    <div id="lightboxOverlay" class="lightbox-overlay" style="display: none;">
+        <div class="lightbox-toolbar">
+            <span class="lightbox-title" id="lightboxTitle">画布预览</span>
+            <div class="zoom-controls">
+                <button id="lightboxZoomOut" title="缩小">-</button>
+                <span class="zoom-level" id="lightboxZoomLevel">100%</span>
+                <button id="lightboxZoomIn" title="放大">+</button>
+                <button id="lightboxResetZoom" title="重置">100%</button>
+            </div>
+            <button class="close-btn" id="lightboxCloseBtn">✕</button>
+        </div>
+        <div class="lightbox-content" id="lightboxContent">
+            <img id="lightboxImage" class="lightbox-image" src="" alt="" draggable="false" />
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/canvases.js?v=202608111051"></script>
+{% endblock %}

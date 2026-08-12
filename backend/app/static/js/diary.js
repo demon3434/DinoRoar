@@ -18,6 +18,8 @@ let fetchLogsCount = 0; // Request ID Tracker for race condition prevention
 let dinoImgMap = {};
 let dinoMap = {};
 let moodTipMap = {};
+let stickerImgMap = {};
+let stickerNameMap = {};
 
 const fallbackDinos = [
     { id: 1, legacy_key: 'Triceratops', name: '快乐三角龙', mood_label: '😊 开心', image_url: 'mood_triceratops.png' },
@@ -49,6 +51,31 @@ async function fetchDinoConfig() {
         console.warn("fetchDinoConfig failed, using fallback:", e);
         populateMaps(fallbackDinos);
         renderMoodDropdown(fallbackDinos);
+    }
+}
+
+async function fetchStickersConfig() {
+    try {
+        const res = await fetch('/api/stickers/config', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) {
+            const seriesList = await res.json();
+            seriesList.forEach(series => {
+                if (series.stickers) {
+                    series.stickers.forEach(st => {
+                        let url = st.image_url;
+                        if (url && !url.startsWith('/') && !url.startsWith('http')) {
+                            url = '/static/images/dinosaurs/' + url;
+                        }
+                        stickerImgMap[st.id] = url;
+                        stickerNameMap[st.id] = st.name;
+                    });
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Failed to fetch stickers config:", e);
     }
 }
 
@@ -100,6 +127,7 @@ async function initDiaryPage() {
     try {
         await fetchDinoConfig();
         await fetchPersons();
+        await fetchStickersConfig();
         
         // Parse url search params for filters
         const urlParams = new URLSearchParams(window.location.search);
@@ -241,6 +269,41 @@ function renderLogs() {
         return;
     }
 
+    const dinoIconMap = {
+        1: 'mood_triceratops',
+        2: 'mood_pterodactyl_happy',
+        3: 'mood_t_rex_proud',
+        4: 'mood_brachiosaurus',
+        5: 'mood_stegosaurus',
+        6: 'mood_velociraptor',
+        7: 'mood_ankylosaurus_scared',
+        8: 'mood_pachycephalosaurus',
+        9: 'mood_parasaurolophus_regret',
+        10: 'mood_spinosaurus',
+        11: 'mood_dilophosaurus',
+        
+        // Legacy mapping
+        Triceratops: 'mood_triceratops',
+        Pterodactyl_happy: 'mood_pterodactyl_happy',
+        Pterodactyl: 'mood_pachycephalosaurus',                    // 历史旧遗憾映射到新肿头龙
+        'T-Rex_proud': 'mood_t_rex_proud',
+        Brachiosaurus: 'mood_brachiosaurus',
+        Stegosaurus: 'mood_stegosaurus',
+        Velociraptor: 'mood_velociraptor',
+        Ankylosaurus: 'mood_ankylosaurus_scared',
+        Ankylosaurus_scared: 'mood_ankylosaurus_scared',
+        'Ankylosaurus_Shell': 'mood_ankylosaurus_scared',
+        Pterodactyl_Sigh: 'mood_pachycephalosaurus',
+        Parasaurolophus_regret: 'mood_parasaurolophus_regret',
+        'Parasaurolophus_Regret': 'mood_parasaurolophus_regret',
+        Parasaurolophus: 'mood_spinosaurus',                         // 历史旧伤心映射到新棘龙
+        'T-Rex': 'mood_dilophosaurus',                               // 历史旧愤怒映射到新双脊龙
+        'T-Rex_Angry': 'mood_dilophosaurus',
+        Spinosaurus: 'mood_spinosaurus',
+        Pachycephalosaurus: 'mood_pachycephalosaurus',
+        Dilophosaurus: 'mood_dilophosaurus'
+    };
+
     childLogs.forEach(log => {
         const dinoText = dinoMap[log.mood_dino_id] || `🦕 ${log.mood_dino || ''}`;
         const incidentDateStr = log.incident_date ? log.incident_date.replace('T', ' ').substring(0, 19) : '';
@@ -259,6 +322,56 @@ function renderLogs() {
                 }
             });
             personsHtml += '</div>';
+        }
+
+        // Parse stickers from content
+        const stickers = [];
+        const stickerRegex = /\[sticker:([^:]+):[0-9.-]+,[0-9.-]+\]/g;
+        let match;
+        while ((match = stickerRegex.exec(log.content || '')) !== null) {
+            stickers.push(match[1].trim());
+        }
+
+        // Generate stickers preview HTML
+        let stickersHtml = '';
+        if (stickers.length > 0) {
+            const isLight = document.documentElement.className.includes('theme-light-warm') ||
+                            document.documentElement.className.includes('theme-nordic-cool') ||
+                            document.documentElement.className.includes('theme-sakura-peach');
+            const stickerBg = isLight ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.05)';
+            const stickerBorder = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.15)';
+            
+            stickersHtml = `<div class="log-stickers-preview" style="display: flex; gap: 6px; align-items: center; max-width: 240px; overflow-x: auto; white-space: nowrap; padding: 2px;">`;
+            stickers.forEach(stickerId => {
+                let srcUrl = '';
+                let name = '';
+                
+                if (stickerImgMap[stickerId]) {
+                    srcUrl = stickerImgMap[stickerId];
+                    name = stickerNameMap[stickerId] || '';
+                } else {
+                    const numId = parseInt(stickerId);
+                    if (!isNaN(numId) && stickerImgMap[numId]) {
+                        srcUrl = stickerImgMap[numId];
+                        name = stickerNameMap[numId] || '';
+                    } else {
+                        let legacyKey = stickerId;
+                        if (!isNaN(numId) && numId >= 1000) {
+                            legacyKey = numId - 1000;
+                        }
+                        const assetName = dinoIconMap[legacyKey] || 'mood_triceratops';
+                        srcUrl = `/static/images/dinosaurs/${assetName}.png`;
+                    }
+                }
+
+                const titleAttr = name ? `title="${name}"` : '';
+                stickersHtml += `
+                    <img src="${srcUrl}" ${titleAttr} 
+                         style="width: 36px; height: 36px; border-radius: 6px; background: ${stickerBg}; border: 1px solid ${stickerBorder}; object-fit: contain; box-shadow: 0 2px 5px rgba(0,0,0,0.15);" 
+                         onerror="this.src='/static/images/ic_launcher.png'" />
+                `;
+            });
+            stickersHtml += `</div>`;
         }
 
         const content = (log.content || '').replace(/\[sticker:[^\]]+\]/g, '').trim();
@@ -288,7 +401,7 @@ function renderLogs() {
         const imgName = dinoImgMap[log.mood_dino_id] || "mood_triceratops.png";
 
         card.innerHTML = `
-            <div class="log-header">
+            <div class="log-header" style="align-items: center;">
                 <div class="log-meta">
                     ${timeHtml}
                     <span class="log-mood-dino" style="font-weight:600; color:var(--text-main);">
@@ -296,6 +409,7 @@ function renderLogs() {
                         <span>${dinoText}</span>
                     </span>
                 </div>
+                ${stickersHtml}
             </div>
             ${personsHtml}
             <div style="margin-top: 10px;">

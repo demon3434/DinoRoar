@@ -81,18 +81,12 @@ function renderPersonBoard() {
     // 1. Render custom categories
     globalCategories.filter(cat => !cat.is_deleted).forEach((cat, index) => {
         const colPersons = groups[cat.uuid] || [];
-        const col = createColumnDOM(cat, colPersons.filter(p => !p.is_temporary), index, globalCategories.length);
+        const col = createColumnDOM(cat, colPersons, index, globalCategories.length);
         container.appendChild(col);
     });
 
 
 
-    // 3. Render Temporary Persons column (Static)
-    const temporaryPersons = globalPersons.filter(p => p.is_temporary && !p.is_deleted);
-    if (temporaryPersons.length > 0) {
-        const tempCol = createColumnDOM({ uuid: 'temporary', name: '一次性临时路人' }, temporaryPersons, -2, 0);
-        container.appendChild(tempCol);
-    }
 
     // 4. Render Disabled Archive area (Separated Columns Container)
     const disabledCategories = globalCategories.filter(c => c.is_deleted);
@@ -119,7 +113,7 @@ function renderPersonBoard() {
         // Render each disabled category
         disabledCategories.forEach(cat => {
             const colPersons = groups[cat.uuid] || [];
-            const col = createDisabledColumnDOM(cat, colPersons.filter(p => !p.is_temporary));
+            const col = createDisabledColumnDOM(cat, colPersons);
             archiveBoard.appendChild(col);
         });
     } else {

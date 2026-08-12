@@ -79,14 +79,17 @@
                     </a>
                 </div>
  
-                <!-- 🎨 贴纸管理 -->
-                <div class="menu-item {% if active_tab.startswith('admin-stickers') %}active{% endif %}" onclick="toggleSubmenu('stickers-submenu')" id="menu-stickers-tab">
+                <!-- 🎨 手账资产管理 -->
+                <div class="menu-item {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}active{% endif %}" onclick="toggleSubmenu('stickers-submenu')" id="menu-stickers-tab">
                     <span>🎨</span>
-                    <span class="sidebar-text">贴纸管理</span>
+                    <span class="sidebar-text">手账资产管理</span>
                 </div>
-                <div class="submenu" id="stickers-submenu" style="max-height: {% if active_tab.startswith('admin-stickers') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-stickers') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
+                <div class="submenu" id="stickers-submenu" style="max-height: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
                     <a href="/admin/stickers" class="submenu-item {% if active_tab == 'admin-stickers-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🦄 自定义贴纸管理
+                        🦄 贴纸管理
+                    </a>
+                    <a href="/admin/canvases" class="submenu-item {% if active_tab == 'admin-canvases-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                        🖼️ 背景画布管理
                     </a>
                 </div>
  

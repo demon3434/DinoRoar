@@ -4,9 +4,9 @@ FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/python:3.11-slim
 
 WORKDIR /workspace
 
-# Use Aliyun mirror for Debian packages
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list || true
-RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources; fi
+# 替换 Debian 软件源为阿里云镜像（DEB822 格式，Trusted: yes 跳过 GPG 校验）
+RUN rm -f /etc/apt/sources.list.d/debian.sources && \
+    printf 'Types: deb\nURIs: http://mirrors.aliyun.com/debian\nSuites: bookworm bookworm-updates\nComponents: main\nTrusted: yes\n\nTypes: deb\nURIs: http://mirrors.aliyun.com/debian-security\nSuites: bookworm-security\nComponents: main\nTrusted: yes\n' > /etc/apt/sources.list.d/debian.sources
 
 
 # Install system dependencies if any library needs compiling
