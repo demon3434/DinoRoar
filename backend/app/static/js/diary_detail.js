@@ -206,13 +206,17 @@ function renderLogDetail(log) {
     
     // Parse stickers
     const stickersList = [];
-    const stickerRegex = /\[sticker:([^:]+):([0-9.-]+),([0-9.-]+)\]/g;
+    const stickerRegex = /\[sticker:([^:]+):([0-9.-]+),([0-9.-]+)(?:,([0-9.-]+),([0-9.-]+),([0-1]),([0-1]))?\]/g;
     let match;
     while ((match = stickerRegex.exec(rawContent)) !== null) {
         stickersList.push({
             dinoId: match[1],
             x: parseFloat(match[2]),
-            y: parseFloat(match[3])
+            y: parseFloat(match[3]),
+            scale: match[4] !== undefined ? parseFloat(match[4]) : 1.0,
+            rotation: match[5] !== undefined ? parseFloat(match[5]) : 0.0,
+            flipH: match[6] !== undefined ? parseInt(match[6]) === 1 : false,
+            flipV: match[7] !== undefined ? parseInt(match[7]) === 1 : false
         });
     }
     
@@ -312,16 +316,30 @@ function renderLogDetail(log) {
                 }
             }
             
-            const maxLogicX = 360 - 56;
-            const maxLogicY = logicalHeight - 56;
-            const safeX = Math.max(0, Math.min(st.x, maxLogicX));
-            const safeY = Math.max(0, Math.min(st.y, maxLogicY));
+            const xMin = Math.max(0, 28 * (st.scale - 1));
+            const xMax = 360 - 28 * (st.scale + 1);
+            const yMin = Math.max(0, 28 * (st.scale - 1));
+            const yMax = logicalHeight - 28 * (st.scale + 1);
+            const safeX = Math.max(xMin, Math.min(st.x, xMax));
+            const safeY = Math.max(yMin, Math.min(st.y, yMax));
 
             const leftPercent = (safeX / 360) * 100;
             const topPercent = (safeY / logicalHeight) * 100;
             
+            let transformStr = `scale(${st.scale}) rotate(${st.rotation}deg)`;
+            if (st.flipH || st.flipV) {
+                transformStr += ` scale(${st.flipH ? -1 : 1}, ${st.flipV ? -1 : 1})`;
+            }
+            
             stickersHtml += `
-                <div style="position: absolute; left: ${leftPercent}%; top: ${topPercent}%; width: 15.5556%; aspect-ratio: 1 / 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
+                <div style="position: absolute; 
+                            left: ${leftPercent}%; 
+                            top: ${topPercent}%; 
+                            width: 15.5556%; 
+                            aspect-ratio: 1 / 1; 
+                            transform: ${transformStr}; 
+                            transform-origin: center; 
+                            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));">
                     <img src="${srcUrl}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.src='/static/images/ic_launcher.png'" />
                 </div>
             `;

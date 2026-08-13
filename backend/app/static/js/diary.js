@@ -326,7 +326,7 @@ function renderLogs() {
 
         // Parse stickers from content
         const stickers = [];
-        const stickerRegex = /\[sticker:([^:]+):[0-9.-]+,[0-9.-]+\]/g;
+        const stickerRegex = /\[sticker:([^:]+):[^\]]+\]/g;
         let match;
         while ((match = stickerRegex.exec(log.content || '')) !== null) {
             stickers.push(match[1].trim());
