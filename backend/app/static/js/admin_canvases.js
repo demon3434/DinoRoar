@@ -27,6 +27,7 @@ async function loadConfig() {
         if (activeFolderId !== null) {
             const activeSeries = allConfig.find(s => s.id === activeFolderId);
             if (activeSeries) {
+                updateFolderDetailTitle(activeSeries);
                 renderSetsGrid(activeSeries);
             } else {
                 closeFolderDetailModal();
@@ -36,6 +37,13 @@ async function loadConfig() {
     } catch (e) {
         console.error("加载后台配置失败", e);
     }
+}
+
+function updateFolderDetailTitle(series) {
+    const titleEl = document.getElementById("detailModalTitle");
+    if (!titleEl || !series) return;
+    const count = series.sets ? series.sets.length : 0;
+    titleEl.innerHTML = `${series.name} - 画布列表 <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); margin-left: 8px;">(${count} 个画布)</span>`;
 }
 
 // ==================== 1. 主页分类文件夹（Folders）渲染 ====================
@@ -189,26 +197,47 @@ async function deleteSeries(seriesId) {
     });
 }
 
+function handleSearch() {
+    const searchInput = document.getElementById("searchSeriesInput");
+    const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
+    document.querySelectorAll(".folder-card").forEach(card => {
+        const id = parseInt(card.getAttribute("data-id"));
+        if (isNaN(id)) return;
+        const series = allConfig.find(s => s.id === id);
+        if (!series) { card.style.display = "none"; return; }
+        const seriesMatch = (series.name || "").toLowerCase().includes(query);
+        const setMatch = series.sets && series.sets.some(st => (st.name || "").toLowerCase().includes(query) || (st.description || "").toLowerCase().includes(query));
+        card.style.display = (seriesMatch || setMatch) ? "flex" : "none";
+    });
+}
+
 function openSeriesModal(seriesId = null) {
     const modal = document.getElementById("seriesModal");
     const title = document.getElementById("seriesModalTitle");
     const nameInput = document.getElementById("seriesName");
-    const sortInput = document.getElementById("seriesSort");
+    const sortInput = document.getElementById("seriesSortOrder") || document.getElementById("seriesSort");
+    const editIdInput = document.getElementById("editSeriesId");
     
-    nameInput.value = "";
-    sortInput.value = 0;
+    if (nameInput) nameInput.value = "";
+    if (editIdInput) editIdInput.value = "";
     
     if (seriesId) {
-        title.textContent = "✏️ 编辑分类系列";
+        if (title) title.textContent = "✏️ 编辑分类系列";
         const series = allConfig.find(s => s.id === seriesId);
         if (series) {
-            nameInput.value = series.name;
-            sortInput.value = series.sort_order;
+            if (nameInput) nameInput.value = series.name;
+            if (sortInput) sortInput.value = series.sort_order;
+            if (editIdInput) editIdInput.value = seriesId;
             modal.setAttribute("data-edit-id", seriesId);
         }
     } else {
-        title.textContent = "✨ 新建分类系列";
+        if (title) title.textContent = "✨ 新建分类系列";
         modal.removeAttribute("data-edit-id");
+        let maxSort = 0;
+        allConfig.forEach(s => {
+            if (s.sort_order > maxSort) maxSort = s.sort_order;
+        });
+        if (sortInput) sortInput.value = maxSort + 1;
     }
     modal.style.display = "flex";
 }
@@ -216,14 +245,20 @@ function openSeriesModal(seriesId = null) {
 function closeSeriesModal() {
     const modal = document.getElementById("seriesModal");
     modal.removeAttribute("data-edit-id");
+    const editIdInput = document.getElementById("editSeriesId");
+    if (editIdInput) editIdInput.value = "";
     modal.style.display = "none";
 }
 
-async function saveSeries() {
+async function submitSeries() {
     const modal = document.getElementById("seriesModal");
-    const editId = modal.getAttribute("data-edit-id");
-    const name = document.getElementById("seriesName").value.trim();
-    const sortOrder = parseInt(document.getElementById("seriesSort").value) || 0;
+    const editIdInput = document.getElementById("editSeriesId");
+    const editId = (editIdInput && editIdInput.value) ? parseInt(editIdInput.value) : (modal.getAttribute("data-edit-id") ? parseInt(modal.getAttribute("data-edit-id")) : null);
+    const nameInput = document.getElementById("seriesName");
+    const sortInput = document.getElementById("seriesSortOrder") || document.getElementById("seriesSort");
+    
+    const name = (nameInput ? nameInput.value : "").trim();
+    const sortOrder = parseInt(sortInput ? sortInput.value : "1") || 0;
     
     if (!name) {
         showToast("请输入分类名称", "error");
@@ -241,16 +276,17 @@ async function saveSeries() {
         closeSeriesModal();
         loadConfig();
     } catch (e) {
-        showToast(e.message, "error");
+        showToast(e.message || "操作失败", "error");
     }
 }
+const saveSeries = submitSeries;
 
 // ==================== 2. 画布详情弹窗/商品套渲染 ====================
 function openFolderDetail(seriesId) {
     activeFolderId = seriesId;
     const series = allConfig.find(s => s.id === seriesId);
     if (series) {
-        document.getElementById("detailModalTitle").textContent = `${series.name} - 画布列表`;
+        updateFolderDetailTitle(series);
         renderSetsGrid(series);
     }
     document.getElementById("folderDetailModal").style.display = "flex";
@@ -305,7 +341,7 @@ function renderSetsGrid(series) {
         let imgHtml = "";
         if (inst && inst.image_url) {
             const aspectStyle = activeRatio.replace(":", "/");
-            imgHtml = `<img class="set-card-preview-img" style="aspect-ratio: ${aspectStyle};" src="${inst.image_url}" onclick="openLightbox('${inst.image_url}', '${cset.name} - ${activeRatio}')" />`;
+            imgHtml = `<img class="set-card-preview-img" style="aspect-ratio: ${aspectStyle};" src="${inst.image_url}" onclick="openLightbox('${inst.image_url}', '${cset.name} - ${activeRatio}', ${cset.id}, '${activeRatio}')" />`;
         } else {
             imgHtml = `<div style="display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--text-muted);">
                 <span style="font-size: 1.8rem; opacity: 0.6;">🖼️</span>
@@ -390,42 +426,76 @@ async function deleteSet(setId) {
     });
 }
 
+function getNextSetSortOrder(seriesId) {
+    let maxSort = 0;
+    const targetSeries = allConfig.find(s => s.id === seriesId);
+    if (targetSeries && targetSeries.sets) {
+        targetSeries.sets.forEach(st => {
+            if (st.sort_order > maxSort) maxSort = st.sort_order;
+        });
+    }
+    return maxSort + 1;
+}
+
+function handleSetSeriesChange() {
+    const modal = document.getElementById("setModal");
+    const editIdInput = document.getElementById("editSetId");
+    const isEdit = (editIdInput && editIdInput.value) || modal.hasAttribute("data-edit-id");
+    // 仅在新增画布模式下联动更新排序序号为该系列的最大序号 + 1
+    if (!isEdit) {
+        const seriesSelect = document.getElementById("setSeriesId");
+        const seriesId = parseInt(seriesSelect ? seriesSelect.value : "0");
+        const sortInput = document.getElementById("setSortOrder") || document.getElementById("setSort");
+        if (sortInput && seriesId) {
+            sortInput.value = getNextSetSortOrder(seriesId);
+        }
+    }
+}
+
 function openSetModal(setId = null) {
     const modal = document.getElementById("setModal");
     const title = document.getElementById("setModalTitle");
     const nameInput = document.getElementById("setName");
     const descInput = document.getElementById("setDesc");
     const priceInput = document.getElementById("setPrice");
-    const sortInput = document.getElementById("setSort");
+    const sortInput = document.getElementById("setSortOrder") || document.getElementById("setSort");
     const seriesSelect = document.getElementById("setSeriesId");
+    const editIdInput = document.getElementById("editSetId");
     
-    nameInput.value = "";
-    descInput.value = "";
-    priceInput.value = 50;
-    sortInput.value = 0;
+    if (nameInput) nameInput.value = "";
+    if (descInput) descInput.value = "";
+    if (priceInput) priceInput.value = 50;
+    if (editIdInput) editIdInput.value = "";
     
-    if (activeFolderId) {
+    if (activeFolderId && seriesSelect) {
         seriesSelect.value = activeFolderId;
     }
     
     if (setId) {
-        title.textContent = "✏️ 编辑画布基本信息";
+        if (title) title.textContent = "✏️ 编辑画布基本信息";
         let foundSet = null;
         allConfig.forEach(s => {
-            const found = s.sets.find(st => st.id === setId);
-            if (found) foundSet = found;
+            if (s.sets) {
+                const found = s.sets.find(st => st.id === setId);
+                if (found) foundSet = found;
+            }
         });
         if (foundSet) {
-            nameInput.value = foundSet.name;
-            descInput.value = foundSet.description || "";
-            priceInput.value = foundSet.exchange_price;
-            sortInput.value = foundSet.sort_order;
-            seriesSelect.value = foundSet.series_id;
+            if (nameInput) nameInput.value = foundSet.name;
+            if (descInput) descInput.value = foundSet.description || "";
+            if (priceInput) priceInput.value = foundSet.exchange_price;
+            if (sortInput) sortInput.value = foundSet.sort_order;
+            if (seriesSelect) seriesSelect.value = foundSet.series_id;
+            if (editIdInput) editIdInput.value = setId;
             modal.setAttribute("data-edit-id", setId);
         }
     } else {
-        title.textContent = "✨ 新增背景画布";
+        if (title) title.textContent = "✨ 新增背景画布";
         modal.removeAttribute("data-edit-id");
+        const currentSeriesId = parseInt(seriesSelect ? seriesSelect.value : "0") || activeFolderId;
+        if (sortInput) {
+            sortInput.value = getNextSetSortOrder(currentSeriesId);
+        }
     }
     modal.style.display = "flex";
 }
@@ -433,21 +503,34 @@ function openSetModal(setId = null) {
 function closeSetModal() {
     const modal = document.getElementById("setModal");
     modal.removeAttribute("data-edit-id");
+    const editIdInput = document.getElementById("editSetId");
+    if (editIdInput) editIdInput.value = "";
     modal.style.display = "none";
 }
 
-async function saveSet() {
+async function submitSet() {
     const modal = document.getElementById("setModal");
-    const editId = modal.getAttribute("data-edit-id");
+    const editIdInput = document.getElementById("editSetId");
+    const editId = (editIdInput && editIdInput.value) ? parseInt(editIdInput.value) : (modal.getAttribute("data-edit-id") ? parseInt(modal.getAttribute("data-edit-id")) : null);
     
-    const seriesId = parseInt(document.getElementById("setSeriesId").value);
-    const name = document.getElementById("setName").value.trim();
-    const description = document.getElementById("setDesc").value.trim();
-    const exchangePrice = parseInt(document.getElementById("setPrice").value) || 50;
-    const sortOrder = parseInt(document.getElementById("setSort").value) || 0;
+    const seriesSelect = document.getElementById("setSeriesId");
+    const seriesId = parseInt(seriesSelect ? seriesSelect.value : "") || activeFolderId;
+    const nameInput = document.getElementById("setName");
+    const descInput = document.getElementById("setDesc");
+    const priceInput = document.getElementById("setPrice");
+    const sortInput = document.getElementById("setSortOrder") || document.getElementById("setSort");
+    
+    const name = (nameInput ? nameInput.value : "").trim();
+    const description = (descInput ? descInput.value : "").trim();
+    const exchangePrice = parseInt(priceInput ? priceInput.value : "50") || 0;
+    const sortOrder = parseInt(sortInput ? sortInput.value : "1") || 0;
     
     if (!name) {
         showToast("请输入画布名称", "error");
+        return;
+    }
+    if (!seriesId) {
+        showToast("请选择所属系列", "error");
         return;
     }
     
@@ -462,24 +545,58 @@ async function saveSet() {
         closeSetModal();
         loadConfig();
     } catch (e) {
-        showToast(e.message, "error");
+        showToast(e.message || "操作失败", "error");
     }
 }
+const saveSet = submitSet;
 
 // ==================== 3. 物理图片裁剪上传 ====================
 function openUploadModal(setId, ratio) {
-    document.getElementById("uploadSetId").value = setId;
-    document.getElementById("uploadRatioSelect").value = ratio;
-    document.getElementById("fileInput").value = "";
+    const setIdInput = document.getElementById("uploadSetId");
+    const ratioSelect = document.getElementById("uploadRatioSelect");
+    const fileInput = document.getElementById("canvasFileInput") || document.getElementById("fileInput");
     
-    document.getElementById("cropperImage").src = "";
-    document.getElementById("cropperImage").style.display = "none";
+    if (setIdInput) setIdInput.value = setId;
+    if (ratioSelect) ratioSelect.value = ratio;
+    if (fileInput) fileInput.value = "";
+
+    // 查找系列名称与画布名称，并在标题栏清晰展示
+    let seriesName = "";
+    let setName = "";
+    allConfig.forEach(s => {
+        if (s.sets) {
+            const found = s.sets.find(st => st.id === setId);
+            if (found) {
+                seriesName = s.name;
+                setName = found.name;
+            }
+        }
+    });
+
+    const titleEl = document.getElementById("uploadModalTitle");
+    if (titleEl) {
+        if (seriesName && setName) {
+            titleEl.innerHTML = `🖼️ 上传并裁剪画布图片 <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); margin-left: 8px;">(系列: <b style="color: #a78bfa;">${seriesName}</b> ｜ 画布: <b style="color: var(--text-main);">${setName}</b>)</span>`;
+        } else if (setName) {
+            titleEl.innerHTML = `🖼️ 上传并裁剪画布图片 <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); margin-left: 8px;">(画布: <b style="color: var(--text-main);">${setName}</b>)</span>`;
+        } else {
+            titleEl.textContent = "🖼️ 上传并裁剪画布图片";
+        }
+    }
+    
+    const cropperImg = document.getElementById("cropperImage");
+    if (cropperImg) {
+        cropperImg.src = "";
+        cropperImg.style.display = "none";
+    }
     const placeholder = document.getElementById("cropperPlaceholder");
     if (placeholder) placeholder.style.display = "flex";
     
     const saveBtn = document.getElementById("saveUploadBtn");
-    saveBtn.disabled = true;
-    saveBtn.textContent = "裁剪并上传";
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "裁剪并上传";
+    }
     
     if (cropperInstance) {
         cropperInstance.destroy();
@@ -497,11 +614,12 @@ function closeUploadModal() {
     document.getElementById("uploadModal").style.display = "none";
 }
 
-function handleUploadFileSelect(e) {
+function loadImageToCropper(e) {
     const file = e.target.files[0];
     if (!file) return;
     loadBlobToCropper(file);
 }
+const handleUploadFileSelect = loadImageToCropper;
 
 function loadBlobToCropper(blob) {
     const reader = new FileReader();
@@ -513,14 +631,15 @@ function loadBlobToCropper(blob) {
         const placeholder = document.getElementById("cropperPlaceholder");
         if (placeholder) placeholder.style.display = "none";
 
-        document.getElementById("saveUploadBtn").disabled = false;
+        const saveBtn = document.getElementById("saveUploadBtn");
+        if (saveBtn) saveBtn.disabled = false;
 
         if (cropperInstance) {
             cropperInstance.destroy();
         }
 
         const selectedRatio = document.getElementById("uploadRatioSelect").value;
-        const aspectVal = ratioMap[selectedRatio];
+        const aspectVal = ratioMap[selectedRatio] || (16 / 9);
 
         cropperInstance = new Cropper(img, {
             aspectRatio: aspectVal,
@@ -539,23 +658,24 @@ function loadBlobToCropper(blob) {
     reader.readAsDataURL(blob);
 }
 
-function changeCropRatio() {
+function onUploadRatioChange() {
     if (!cropperInstance) return;
     const selectedRatio = document.getElementById("uploadRatioSelect").value;
-    const aspectVal = ratioMap[selectedRatio];
+    const aspectVal = ratioMap[selectedRatio] || (16 / 9);
     cropperInstance.setAspectRatio(aspectVal);
 }
+const changeCropRatio = onUploadRatioChange;
 
-function saveCroppedImage() {
+async function performCroppedUpload() {
     if (!cropperInstance) {
-        alert("请先选择并裁剪图片");
+        showToast("请先选择并裁剪图片", "info");
         return;
     }
 
     const setId = document.getElementById("uploadSetId").value;
     const selectedRatio = document.getElementById("uploadRatioSelect").value;
 
-    const r_val = ratioMap[selectedRatio];
+    const r_val = ratioMap[selectedRatio] || (16 / 9);
     const targetWidth = 1440;
     const targetHeight = Math.round(targetWidth / r_val);
 
@@ -567,14 +687,18 @@ function saveCroppedImage() {
     });
 
     const saveBtn = document.getElementById("saveUploadBtn");
-    saveBtn.disabled = true;
-    saveBtn.textContent = "正在上传...";
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "正在上传...";
+    }
 
     croppedCanvas.toBlob(async (blob) => {
         if (!blob) {
-            alert("裁剪处理失败");
-            saveBtn.disabled = false;
-            saveBtn.textContent = "裁剪并上传";
+            showToast("裁剪处理失败", "error");
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "裁剪并上传";
+            }
             return;
         }
 
@@ -592,21 +716,50 @@ function saveCroppedImage() {
             });
 
             if (response.ok) {
+                showToast("画布图片上传成功！", "success");
                 closeUploadModal();
                 loadConfig();
             } else {
-                const err = await response.json();
-                alert(`❌ 上传失败: ${err.detail || "服务器错误"}`);
-                saveBtn.disabled = false;
-                saveBtn.textContent = "裁剪并上传";
+                const err = await response.json().catch(() => ({}));
+                showToast(`❌ 上传失败: ${err.detail || "服务器错误"}`, "error");
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = "裁剪并上传";
+                }
             }
         } catch (e) {
             console.error("上传出错", e);
-            alert("❌ 网络上传请求失败！");
-            saveBtn.disabled = false;
-            saveBtn.textContent = "裁剪并上传";
+            showToast("❌ 网络上传请求失败！", "error");
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "裁剪并上传";
+            }
         }
     }, "image/png");
+}
+const saveCroppedImage = performCroppedUpload;
+
+async function pasteImageFromClipboard() {
+    try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            showToast("您的浏览器不支持直接读取剪贴板，请直接使用键盘 Ctrl + V 粘贴！", "info");
+            return;
+        }
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+            const imageType = item.types.find(type => type.startsWith("image/"));
+            if (imageType) {
+                const blob = await item.getType(imageType);
+                loadBlobToCropper(blob);
+                showToast("已成功从剪贴板读取图片！", "success");
+                return;
+            }
+        }
+        showToast("剪贴板中未发现图片数据，请先复制图片或使用 Ctrl + V", "info");
+    } catch (err) {
+        console.warn("读取剪贴板失败或被拒绝", err);
+        showToast("无法直接读取剪贴板（可能需要授权），您可直接按 Ctrl + V 粘贴图片！", "info");
+    }
 }
 
 function initPasteImageEvent() {

@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 
-{% block title %}小恐龙 DinoRoar 管理后台 - 背景画布管理{% endblock %}
+{% block title %}小恐龙 DinoRoar 管理后台 - 画布管理{% endblock %}
 
 {% block head %}
 <!-- Cropper.js CDN -->
@@ -700,6 +700,47 @@
         transform-origin: center center;
     }
 
+    .lightbox-nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 52px;
+        height: 88px;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #f1f5f9;
+        font-size: 2.8rem;
+        font-weight: 300;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: 14px;
+        z-index: 100;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        user-select: none;
+        outline: none;
+    }
+
+    .lightbox-nav-btn:hover {
+        background: rgba(139, 92, 246, 0.65);
+        border-color: rgba(167, 139, 250, 0.6);
+        color: #ffffff;
+        transform: translateY(-50%) scale(1.08);
+        box-shadow: 0 0 24px rgba(139, 92, 246, 0.5);
+    }
+
+    .lightbox-nav-btn.prev-btn {
+        left: 28px;
+    }
+
+    .lightbox-nav-btn.next-btn {
+        right: 28px;
+    }
+
     .export-selected {
         border-color: #8b5cf6 !important;
         box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
@@ -792,7 +833,7 @@
 <div style="display: flex; flex-direction: column; gap: 2px;">
     <header style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
         <div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0;">🖼️ 背景画布管理</h2>
+            <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0;">🖼️ 画布管理</h2>
         </div>
         <div style="display: flex; gap: 12px; align-items: center;">
             <input type="text" id="searchSeriesInput" class="form-control" placeholder="🔍 搜索筛选..." style="width: 150px; height: 38px; margin: 0; font-size: 0.82rem;" oninput="handleSearch()">
@@ -873,7 +914,7 @@
         
         <div class="form-group" style="margin-bottom: 10px;">
             <label for="setSeriesId">所属系列</label>
-            <select id="setSeriesId" class="form-control-input" style="padding: 0 8px; height: 36px;"></select>
+            <select id="setSeriesId" class="form-control-input" style="padding: 0 8px; height: 36px;" onchange="handleSetSeriesChange()"></select>
         </div>
         
         <div class="form-group" style="margin-bottom: 10px;">
@@ -1026,14 +1067,16 @@
         <button class="close-btn" id="lightboxCloseBtn">✕</button>
     </div>
     <div class="lightbox-content" id="lightboxContent">
+        <button id="lightboxPrevBtn" class="lightbox-nav-btn prev-btn" title="上一个比例图片 (←)">‹</button>
         <img id="lightboxImage" class="lightbox-image" src="" alt="" draggable="false" />
+        <button id="lightboxNextBtn" class="lightbox-nav-btn next-btn" title="下一个比例图片 (→)">›</button>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin_canvases_api.js?v=202608120710"></script>
-<script src="/static/js/admin_canvases_lightbox.js?v=202608120710"></script>
-<script src="/static/js/admin_canvases_drag.js?v=202608120710"></script>
-<script src="/static/js/admin_canvases.js?v=202608120710"></script>
+<script src="/static/js/admin_canvases_api.js?v=202608150843"></script>
+<script src="/static/js/admin_canvases_lightbox.js?v=202608150843"></script>
+<script src="/static/js/admin_canvases_drag.js?v=202608150843"></script>
+<script src="/static/js/admin_canvases.js?v=202608150843"></script>
 {% endblock %}

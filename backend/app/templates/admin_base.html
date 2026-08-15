@@ -10,9 +10,9 @@
     <link rel="stylesheet" href="/static/css/fonts.css">
     
     <!-- Dashboard CSS -->
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=202607142306">
-    {% block head %}<link rel="stylesheet" href="/static/css/admin_base.css">{% endblock %}
-    <link rel="stylesheet" href="/static/css/admin_base.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=202608150938">
+    <link rel="stylesheet" href="/static/css/admin_base.css?v=202608150938">
+    {% block head %}{% endblock %}
 </head>
 <body>
     <!-- Token verification & Theme recovery BEFORE rendering elements to prevent flash -->
@@ -69,56 +69,76 @@
             
             <div class="sidebar-menu">
                 <!-- 👥 账户管理 -->
-                <div class="menu-item {% if active_tab.startswith('admin-users') %}active{% endif %}" onclick="toggleSubmenu('users-submenu')" id="menu-users-tab">
-                    <span>👥</span>
-                    <span class="sidebar-text">账户管理</span>
-                </div>
-                <div class="submenu" id="users-submenu" style="max-height: {% if active_tab.startswith('admin-users') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-users') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
-                    <a href="/admin/users" class="submenu-item {% if active_tab == 'admin-users-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        👦 孩子账号列表
-                    </a>
+                <div class="menu-group {% if active_tab.startswith('admin-users') %}open{% endif %}">
+                    <div class="menu-item {% if active_tab.startswith('admin-users') %}active{% endif %}" onclick="toggleSubmenu('users-submenu')" id="menu-users-tab">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>👥</span>
+                            <span class="sidebar-text">账户管理</span>
+                        </div>
+                        <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                    </div>
+                    <div class="submenu {% if active_tab.startswith('admin-users') %}open{% endif %}" id="users-submenu" style="max-height: {% if active_tab.startswith('admin-users') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-users') %}1{% else %}0{% endif %};">
+                        <a href="/admin/users" class="submenu-item {% if active_tab == 'admin-users-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            👦 孩子账号列表
+                        </a>
+                    </div>
                 </div>
  
                 <!-- 🎨 手账资产管理 -->
-                <div class="menu-item {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}active{% endif %}" onclick="toggleSubmenu('stickers-submenu')" id="menu-stickers-tab">
-                    <span>🎨</span>
-                    <span class="sidebar-text">手账资产管理</span>
-                </div>
-                <div class="submenu" id="stickers-submenu" style="max-height: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
-                    <a href="/admin/stickers" class="submenu-item {% if active_tab == 'admin-stickers-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🦄 贴纸管理
-                    </a>
-                    <a href="/admin/canvases" class="submenu-item {% if active_tab == 'admin-canvases-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🖼️ 背景画布管理
-                    </a>
+                <div class="menu-group {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}open{% endif %}">
+                    <div class="menu-item {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}active{% endif %}" onclick="toggleSubmenu('stickers-submenu')" id="menu-stickers-tab">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>🎨</span>
+                            <span class="sidebar-text">手账资产管理</span>
+                        </div>
+                        <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                    </div>
+                    <div class="submenu {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}open{% endif %}" id="stickers-submenu" style="max-height: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-stickers') or active_tab.startswith('admin-canvases') %}1{% else %}0{% endif %};">
+                        <a href="/admin/stickers" class="submenu-item {% if active_tab == 'admin-stickers-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🦄 贴纸管理
+                        </a>
+                        <a href="/admin/canvases" class="submenu-item {% if active_tab == 'admin-canvases-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🖼️ 画布管理
+                        </a>
+                    </div>
                 </div>
  
                 <!-- ⚙️ 系统维护 -->
-                <div class="menu-item {% if active_tab.startswith('admin-system') %}active{% endif %}" onclick="toggleSubmenu('system-submenu')" id="menu-system-tab">
-                    <span>⚙️</span>
-                    <span class="sidebar-text">系统维护</span>
-                </div>
-                <div class="submenu" id="system-submenu" style="max-height: {% if active_tab.startswith('admin-system') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-system') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
-                    <a href="/admin/settings" class="submenu-item {% if active_tab == 'admin-system-settings' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🌐 全局服务发现
-                    </a>
-                    <a href="/admin/maintenance" class="submenu-item {% if active_tab == 'admin-system-maintenance' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🧹 磁盘冗余清理
-                    </a>
+                <div class="menu-group {% if active_tab.startswith('admin-system') %}open{% endif %}">
+                    <div class="menu-item {% if active_tab.startswith('admin-system') %}active{% endif %}" onclick="toggleSubmenu('system-submenu')" id="menu-system-tab">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>⚙️</span>
+                            <span class="sidebar-text">系统维护</span>
+                        </div>
+                        <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                    </div>
+                    <div class="submenu {% if active_tab.startswith('admin-system') %}open{% endif %}" id="system-submenu" style="max-height: {% if active_tab.startswith('admin-system') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-system') %}1{% else %}0{% endif %};">
+                        <a href="/admin/settings" class="submenu-item {% if active_tab == 'admin-system-settings' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🌐 全局服务发现
+                        </a>
+                        <a href="/admin/maintenance" class="submenu-item {% if active_tab == 'admin-system-maintenance' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🧹 磁盘冗余清理
+                        </a>
+                    </div>
                 </div>
  
                 <!-- 🔧 个人设置 -->
-                <div class="menu-item {% if active_tab.startswith('admin-personal') %}active{% endif %}" onclick="toggleSubmenu('personal-submenu')" id="menu-personal-tab">
-                    <span>🔧</span>
-                    <span class="sidebar-text">个人设置</span>
-                </div>
-                <div class="submenu" id="personal-submenu" style="max-height: {% if active_tab.startswith('admin-personal') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-personal') %}1{% else %}0{% endif %}; transition: max-height 0.3s ease, opacity 0.3s ease;">
-                    <a href="/admin/password" class="submenu-item {% if active_tab == 'admin-personal-password' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🔒 修改安全密码
-                    </a>
-                    <a href="/admin/theme" class="submenu-item {% if active_tab == 'admin-personal-theme' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                        🎨 个性化主题色
-                    </a>
+                <div class="menu-group {% if active_tab.startswith('admin-personal') %}open{% endif %}">
+                    <div class="menu-item {% if active_tab.startswith('admin-personal') %}active{% endif %}" onclick="toggleSubmenu('personal-submenu')" id="menu-personal-tab">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>🔧</span>
+                            <span class="sidebar-text">个人设置</span>
+                        </div>
+                        <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                    </div>
+                    <div class="submenu {% if active_tab.startswith('admin-personal') %}open{% endif %}" id="personal-submenu" style="max-height: {% if active_tab.startswith('admin-personal') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-personal') %}1{% else %}0{% endif %};">
+                        <a href="/admin/password" class="submenu-item {% if active_tab == 'admin-personal-password' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🔒 修改安全密码
+                        </a>
+                        <a href="/admin/theme" class="submenu-item {% if active_tab == 'admin-personal-theme' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
+                            🎨 个性化主题色
+                        </a>
+                    </div>
                 </div>
             </div>
  
@@ -146,7 +166,7 @@
     <!-- Reusable Toast Notification Container -->
     <div id="toastNotification" class="toast-notification"></div>
  
-    <script src="/static/js/admin_base.js"></script>
+    <script src="/static/js/admin_base.js?v=202608150938"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

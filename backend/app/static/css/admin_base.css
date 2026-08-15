@@ -580,3 +580,195 @@ select.form-control option {
     object-fit: cover;
     border-radius: 8px;
 }
+
+/* ==================== 8. 全局侧边栏导航全新高亮设计 ==================== */
+
+/* 侧边栏菜单容器 */
+.sidebar .sidebar-menu {
+    flex: 1;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px !important;
+    overflow-y: auto;
+}
+
+/* 菜单分组 */
+.sidebar .menu-group {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+}
+
+/* 侧边栏主菜单项 (父级分类 Header) */
+.sidebar .menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    margin: 1px 4px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.90rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-left: none !important;
+    background: transparent !important;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.sidebar .menu-item:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+:root.theme-light-warm .sidebar .menu-item:hover,
+:root.theme-nordic-cool .sidebar .menu-item:hover,
+:root.theme-sakura-peach .sidebar .menu-item:hover,
+:root.theme-autumn-maple .sidebar .menu-item:hover,
+:root.theme-macaron-pink .sidebar .menu-item:hover,
+:root.theme-macaron-blue .sidebar .menu-item:hover,
+:root.theme-macaron-green .sidebar .menu-item:hover,
+:root.theme-macaron-yellow .sidebar .menu-item:hover,
+:root.theme-macaron-purple .sidebar .menu-item:hover,
+:root.theme-macaron-orange .sidebar .menu-item:hover {
+    background: rgba(0, 0, 0, 0.035) !important;
+}
+
+/* 父级激活状态 (仅作分组提示，不抢占焦点) */
+.sidebar .menu-item.active {
+    color: var(--text-main) !important;
+    font-weight: 700;
+    background: transparent !important;
+    border-left: none !important;
+}
+
+.sidebar .menu-item .menu-arrow {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.sidebar .menu-item .menu-arrow svg {
+    display: block;
+    width: 13px;
+    height: 13px;
+}
+
+.sidebar .menu-item.active .menu-arrow {
+    transform: rotate(180deg);
+    color: var(--primary, #8b5cf6);
+    opacity: 1;
+}
+
+/* 子菜单容器 (折叠时零边距零占位) */
+.sidebar .submenu {
+    max-height: 0;
+    opacity: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-left: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, margin 0.2s ease;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* 子菜单容器 (展开时精致导引线) */
+.sidebar .submenu.open {
+    max-height: 200px;
+    opacity: 1;
+    padding-left: 10px !important;
+    margin: 2px 4px 4px 16px !important;
+    border-left: 2px solid rgba(139, 92, 246, 0.25);
+}
+
+:root.theme-light-warm .sidebar .submenu.open,
+:root.theme-nordic-cool .sidebar .submenu.open,
+:root.theme-sakura-peach .sidebar .submenu.open,
+:root.theme-autumn-maple .sidebar .submenu.open,
+:root.theme-macaron-pink .sidebar .submenu.open,
+:root.theme-macaron-blue .sidebar .submenu.open,
+:root.theme-macaron-green .sidebar .submenu.open,
+:root.theme-macaron-yellow .sidebar .submenu.open,
+:root.theme-macaron-purple .sidebar .submenu.open,
+:root.theme-macaron-orange .sidebar .submenu.open {
+    border-left-color: rgba(124, 58, 237, 0.2);
+}
+
+/* 子菜单项 - 普通状态 (预留右侧边距防裁切) */
+.sidebar .submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84rem;
+    padding: 7px 12px;
+    margin-right: 6px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar .submenu-item:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+:root.theme-light-warm .sidebar .submenu-item:hover,
+:root.theme-nordic-cool .sidebar .submenu-item:hover,
+:root.theme-sakura-peach .sidebar .submenu-item:hover,
+:root.theme-autumn-maple .sidebar .submenu-item:hover,
+:root.theme-macaron-pink .sidebar .submenu-item:hover,
+:root.theme-macaron-blue .sidebar .submenu-item:hover,
+:root.theme-macaron-green .sidebar .submenu-item:hover,
+:root.theme-macaron-yellow .sidebar .submenu-item:hover,
+:root.theme-macaron-purple .sidebar .submenu-item:hover,
+:root.theme-macaron-orange .sidebar .submenu-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+/* 子菜单项 - 选中高亮状态 (暗色主题) */
+.sidebar .submenu-item.active {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.28) 0%, rgba(168, 85, 247, 0.18) 100%) !important;
+    border: 1px solid rgba(167, 139, 250, 0.5) !important;
+    color: #f5f3ff !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 3px 10px rgba(139, 92, 246, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 子菜单项 - 选中高亮状态 (亮色温暖/北欧/粉桃/秋枫/马卡龙各全系亮色主题) */
+:root.theme-light-warm .sidebar .submenu-item.active,
+:root.theme-nordic-cool .sidebar .submenu-item.active,
+:root.theme-sakura-peach .sidebar .submenu-item.active,
+:root.theme-autumn-maple .sidebar .submenu-item.active,
+:root.theme-macaron-pink .sidebar .submenu-item.active,
+:root.theme-macaron-blue .sidebar .submenu-item.active,
+:root.theme-macaron-green .sidebar .submenu-item.active,
+:root.theme-macaron-yellow .sidebar .submenu-item.active,
+:root.theme-macaron-purple .sidebar .submenu-item.active,
+:root.theme-macaron-orange .sidebar .submenu-item.active {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+    border: 1px solid #7c3aed !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35) !important;
+}
+

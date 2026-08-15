@@ -179,6 +179,8 @@ async def upload_sticker(
         is_active=True
     )
     db.add(sticker_cfg)
+    db.flush()
+    stickers_service.reorder_stickers_in_series(db, series_id, sticker_cfg.id, sort_order)
     db.commit()
     db.refresh(sticker_cfg)
     return sticker_cfg

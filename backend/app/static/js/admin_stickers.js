@@ -17,12 +17,24 @@ async function loadStickerManagementData() {
         renderFolders(loadedSeriesData);
         if (activeFolderId !== null) {
             const folder = loadedSeriesData.find(s => s.id === activeFolderId);
-            if (folder) renderStickerList(folder); else closeFolderDetailModal();
+            if (folder) {
+                updateFolderDetailTitle(folder);
+                renderStickerList(folder);
+            } else {
+                closeFolderDetailModal();
+            }
         }
     } catch(err) {
         showToast("拉取贴纸库失败：" + err.message, "error");
         seriesContainer.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--dino-red);">拉取贴纸配置失败！</div>`;
     }
+}
+
+function updateFolderDetailTitle(series) {
+    const titleEl = document.getElementById('detailModalTitle');
+    if (!titleEl || !series) return;
+    const count = series.stickers ? series.stickers.length : 0;
+    titleEl.innerHTML = `📁 ${series.name} - 贴纸列表 <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); margin-left: 8px;">(${count} 个贴纸)</span>`;
 }
 
 function renderFolders(data) {
@@ -175,7 +187,7 @@ function openFolderDetail(seriesId) {
     activeFolderId = seriesId; const series = loadedSeriesData.find(s => s.id === seriesId); if (!series) return;
     exitStickerBatchDeleteMode();
     renderStickerList(series);
-    document.getElementById('detailModalTitle').textContent = `📁 ${series.name} - 贴纸列表`;
+    updateFolderDetailTitle(series);
     const addBtn = document.getElementById('btnAddStickerTrigger');
     if (!series.is_active) { addBtn.style.display = 'none'; }
     else { addBtn.style.display = 'block'; }

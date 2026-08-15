@@ -18,6 +18,7 @@ function toggleSidebar() {
 // Submenu Toggle
 function toggleSubmenu(submenuId) {
     const submenu = document.getElementById(submenuId);
+    if (!submenu) return;
     const parentMap = {
         'users-submenu': 'menu-users-tab',
         'system-submenu': 'menu-system-tab',
@@ -25,14 +26,17 @@ function toggleSubmenu(submenuId) {
         'stickers-submenu': 'menu-stickers-tab'
     };
     const parentMenu = document.getElementById(parentMap[submenuId]);
-    if (submenu.style.maxHeight === '0px' || submenu.style.maxHeight === '') {
+    const isOpen = submenu.classList.contains('open');
+    if (!isOpen) {
+        submenu.classList.add('open');
         submenu.style.maxHeight = '200px';
         submenu.style.opacity = '1';
-        parentMenu.classList.add('active');
+        if (parentMenu) parentMenu.classList.add('active');
     } else {
+        submenu.classList.remove('open');
         submenu.style.maxHeight = '0px';
         submenu.style.opacity = '0';
-        parentMenu.classList.remove('active');
+        if (parentMenu) parentMenu.classList.remove('active');
     }
 }
 

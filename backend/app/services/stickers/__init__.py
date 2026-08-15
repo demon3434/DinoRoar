@@ -13,6 +13,7 @@ from .crud import (
     update_sticker,
     cascade_delete_series,
     batch_delete_stickers,
+    reorder_stickers_in_series,
 )
 
 from .inventory import (
