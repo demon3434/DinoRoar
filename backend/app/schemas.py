@@ -194,6 +194,8 @@ class StickerConfigResponse(BaseModel):
     description: Optional[str] = None
     sort_order: int
     exchange_price: int
+    original_price: Optional[int] = None
+    is_on_sale: Optional[bool] = False
     is_active: bool = True
     is_deleted: bool = False
     created_at: datetime.datetime
@@ -248,6 +250,7 @@ class StickerBatchDeleteRequest(BaseModel):
     sticker_ids: List[int]
 
 
+
 # Canvas Schemas
 class CanvasInstanceResponse(BaseModel):
     id: int
@@ -270,12 +273,15 @@ class CanvasSetResponse(BaseModel):
     description: Optional[str] = None
     sort_order: int
     exchange_price: int
+    original_price: Optional[int] = None
+    is_on_sale: Optional[bool] = False
     is_active: bool = True
     is_deleted: bool = False
     created_at: datetime.datetime
     instances: List[CanvasInstanceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class CanvasSeriesResponse(BaseModel):
@@ -293,6 +299,97 @@ class CanvasSeriesResponse(BaseModel):
 class CanvasSyncPayload(BaseModel):
     canvas_inventory: str = ""
     egg_energy: int
+
+
+# ==========================================
+# 统一手账商城与促销活动 (Shop & Promotions)
+# ==========================================
+
+class ShopItemResponse(BaseModel):
+    shop_item_id: int
+    item_type: str
+    target_id: int
+    original_price: int
+    current_price: int
+    is_on_sale: bool
+    is_active: bool
+    sort_order: int
+    is_owned: bool = False
+    owned_count: int = 0
+    asset: dict = {}
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ShopExchangeRequest(BaseModel):
+    shop_item_ids: List[int] = Field(..., min_length=1, description="待兑换的统一商品 ID 列表")
+
+
+class PromotionTargetCreate(BaseModel):
+    target_scope: str = Field("ALL", description="作用范围: ALL | ITEM_TYPE | SERIES | SHOP_ITEM")
+    target_type: Optional[str] = Field(None, description="STICKER | CANVAS_SET")
+    target_id: Optional[int] = Field(None, description="系列 ID 或 shop_item_id")
+    discount_rate: Optional[float] = Field(None, ge=0.01, le=1.0, description="折扣率，如 0.8 表示 8 折")
+    fixed_price: Optional[int] = Field(None, ge=1, description="单品指定特惠一口价蛋能量")
+
+
+class PromotionCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="活动名称")
+    description: Optional[str] = Field(None, description="活动说明")
+    start_time: datetime.datetime = Field(..., description="生效开始时间")
+    end_time: datetime.datetime = Field(..., description="生效结束时间")
+    is_active: bool = Field(True, description="是否启用")
+    targets: List[PromotionTargetCreate] = Field(default_factory=list, description="优惠规则列表")
+
+
+class PromotionUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    is_active: Optional[bool] = None
+    targets: Optional[List[PromotionTargetCreate]] = None
+
+
+class PromotionToggleActiveRequest(BaseModel):
+    is_active: bool
+
+
+class PromotionTargetResponse(BaseModel):
+    id: int
+    promotion_id: int
+    target_scope: str
+    target_type: Optional[str] = None
+    target_id: Optional[int] = None
+    discount_rate: Optional[float] = None
+    fixed_price: Optional[int] = None
+    created_at: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PromotionResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    start_time: datetime.datetime
+    end_time: datetime.datetime
+    is_active: bool
+    is_deleted: bool
+    created_at: datetime.datetime
+    targets: List[PromotionTargetResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PromotionPaginationResponse(BaseModel):
+    items: List[PromotionResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 
 
 

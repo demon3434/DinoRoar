@@ -200,9 +200,33 @@ async def lifespan(app: FastAPI):
                 db.execute(text("ALTER TABLE sticker_series ADD COLUMN is_deleted BOOLEAN DEFAULT 0"))
                 db.commit()
 
+            # Migration check: Add media_rewarded column to logs if missing
+            try:
+                db.execute(text("SELECT media_rewarded FROM logs LIMIT 1"))
+            except Exception:
+                db.rollback()
+                logger.info("Database Migration: Adding missing 'media_rewarded' column to 'logs' table...")
+                db.execute(text("ALTER TABLE logs ADD COLUMN media_rewarded BOOLEAN DEFAULT 0"))
+                db.commit()
+                logger.info("Database Migration: 'media_rewarded' column added successfully.")
 
-
-
+            # 历史数据自愈与补齐：如果日记已有有效附件但未标记 media_rewarded，为对应用户补发 20 蛋能量并标记已奖励
+            try:
+                unrewarded_logs_with_media = db.execute(text("""
+                    SELECT DISTINCT l.id, l.user_id, l.uuid 
+                    FROM logs l 
+                    JOIN attachments a ON l.uuid = a.log_uuid 
+                    WHERE (l.media_rewarded = 0 OR l.media_rewarded IS NULL)
+                """)).fetchall()
+                for row in unrewarded_logs_with_media:
+                    log_id, user_id, log_uuid = row[0], row[1], row[2]
+                    db.execute(text("UPDATE users SET egg_energy = egg_energy + 20 WHERE id = :uid"), {"uid": user_id})
+                    db.execute(text("UPDATE logs SET media_rewarded = 1 WHERE id = :lid"), {"lid": log_id})
+                    logger.info(f"Sticker Economy Migration: User {user_id} rewarded +20 bonus energy for historical media log {log_uuid}")
+                db.commit()
+            except Exception as heal_err:
+                db.rollback()
+                logger.warning(f"Failed to auto-heal historical media rewards: {heal_err}")
 
             # Seed default series '3D恐龙' if not exists
             try:
@@ -536,6 +560,15 @@ async def lifespan(app: FastAPI):
                     logger.info(f"Attachment Migration: Successfully migrated {res['migrated_count']} legacy files.")
             except Exception as mig_err:
                 logger.error(f"Attachment Migration: Error during startup migration: {mig_err}")
+
+            # Perform smooth migration and auto-sync of shop items
+            try:
+                from .services.shop import migrate_shop_items
+                shop_mig_count = migrate_shop_items(db)
+                if shop_mig_count > 0:
+                    logger.info(f"Shop Migration: Successfully synced {shop_mig_count} items into shop_items.")
+            except Exception as shop_mig_err:
+                logger.error(f"Shop Migration: Error during startup migration: {shop_mig_err}")
         finally:
             db.close()
     except Exception as e:
@@ -574,7 +607,7 @@ app = FastAPI(
 )
 
 # Register Routers
-from .routers import auth, logs, settings as settings_router, attachments, admin_users, pages, persons, categories, dino_config, stickers, stt, canvases
+from .routers import auth, logs, settings as settings_router, attachments, admin_users, pages, persons, categories, dino_config, stickers, stt, canvases, shop
 app.include_router(auth.router)
 app.include_router(logs.router)
 app.include_router(settings_router.router)
@@ -587,6 +620,8 @@ app.include_router(dino_config.router)
 app.include_router(stickers.router)
 app.include_router(stt.router)
 app.include_router(canvases.router)
+app.include_router(shop.router)
+
 
 
 # Mount Static Files

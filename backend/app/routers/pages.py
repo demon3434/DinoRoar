@@ -87,5 +87,10 @@ async def get_canvases_page(request: Request):
 async def get_admin_canvases_page(request: Request):
     return templates.TemplateResponse(request, "admin_canvases.html", {"active_tab": "admin-canvases-list"})
 
+@router.get("/admin/promotions", response_class=HTMLResponse)
+async def get_admin_promotions_page(request: Request):
+    return templates.TemplateResponse(request, "admin_promotions.html", {"active_tab": "admin-promotions-list"})
+
+
 
 

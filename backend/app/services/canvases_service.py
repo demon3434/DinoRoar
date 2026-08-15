@@ -7,10 +7,17 @@ from typing import List, Optional
 from ..models import CanvasSeries, CanvasSet, CanvasInstance
 from ..config import settings
 
-def get_canvases_config(db: Session, only_active: bool = True) -> List[dict]:
+def get_canvases_config(db: Session, only_active: bool = True, apply_promo: bool = True) -> List[dict]:
     """
     获取画布系列分类及其嵌套的商品套、图片列表
+    apply_promo: True 则 exchange_price 为当前促销实付价；False 则为基础原价（供 Admin 端使用）
     """
+    from .shop.pricing import calculate_item_price
+    from .shop.promotions import get_active_promotion_targets
+    from ..models import ShopItem
+
+    active_targets = get_active_promotion_targets(db) if apply_promo else []
+
     query = db.query(CanvasSeries).filter(CanvasSeries.is_deleted == False)
     if only_active:
         query = query.filter(CanvasSeries.is_active == True)
@@ -36,18 +43,37 @@ def get_canvases_config(db: Session, only_active: bool = True) -> List[dict]:
             instances = inst_query.all()
             sorted_instances = sorted(instances, key=lambda inst: ratio_order.get(inst.aspect_ratio, 99))
             
+            # 计算促销折后价
+            shop_item = db.query(ShopItem).filter(
+                ShopItem.item_type == "CANVAS_SET",
+                ShopItem.target_id == cset.id
+            ).first()
+            orig = shop_item.original_price if shop_item else (cset.exchange_price or 50)
+            item_id = shop_item.id if shop_item else 7000 + cset.id
+            price, is_sale = calculate_item_price(
+                original_price=orig,
+                item_type="CANVAS_SET",
+                shop_item_id=item_id,
+                series_id=series.id,
+                active_targets=active_targets
+            )
+
             sets_response.append({
                 "id": cset.id,
                 "series_id": cset.series_id,
                 "name": cset.name,
                 "description": cset.description,
                 "sort_order": cset.sort_order,
-                "exchange_price": cset.exchange_price,
+                "exchange_price": price if apply_promo else orig,
+                "original_price": orig,
+                "is_on_sale": is_sale,
                 "is_active": cset.is_active,
                 "is_deleted": cset.is_deleted,
                 "created_at": cset.created_at,
                 "instances": sorted_instances
             })
+
+
 
         result.append({
             "id": series.id,

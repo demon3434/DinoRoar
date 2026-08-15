@@ -172,7 +172,10 @@ function renderLogDetail(log) {
     
     const incidentDateStr = log.incident_date ? log.incident_date.replace('T', ' ').substring(0, 19) : '';
     const updatedAtStr = log.updated_at ? log.updated_at.replace('T', ' ').substring(0, 19) : '';
-    const isEdited = incidentDateStr !== updatedAtStr && log.updated_at;
+    const incDate = log.incident_date ? new Date(log.incident_date) : null;
+    const updDate = log.updated_at ? new Date(log.updated_at) : null;
+    const isEdited = (log.version > 1) && incDate && updDate && (updDate.getTime() - incDate.getTime() > 10000);
+
     
     let metaHtml = `
         <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); flex-wrap:wrap; gap:10px;">

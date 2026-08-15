@@ -60,10 +60,35 @@ async function initOverviewPage() {
         await fetchDinoConfig();
         await fetchPersons();
         await updateOverview();
+        loadDashboardPromoBanner();
     } catch (e) {
         console.error("Failed to initialize overview page", e);
     }
 }
+
+async function loadDashboardPromoBanner() {
+    try {
+        const res = await fetch('/api/promotions/active-summary');
+        if (!res.ok) return;
+        const promos = await res.json();
+        const bannerEl = document.getElementById('dashboardPromoBanner');
+        const titleEl = document.getElementById('dashboardPromoTitle');
+        const descEl = document.getElementById('dashboardPromoDesc');
+        if (bannerEl && promos && promos.length > 0) {
+            const p = promos[0];
+            if (titleEl) titleEl.textContent = `🎉 节日特惠：${p.name}`;
+            const ruleText = (p.rules_summary && p.rules_summary.length > 0) 
+                ? p.rules_summary.join(' · ') 
+                : (p.description ? p.description : '手账商城贴纸、画布特惠打折中，快去选购吧！');
+            if (descEl) descEl.textContent = `✨ ${ruleText}`;
+            bannerEl.style.display = 'flex';
+        }
+    } catch (e) {
+
+        console.error('加载看板活动横幅失败', e);
+    }
+}
+
 
 async function fetchPersons() {
     try {

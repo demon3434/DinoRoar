@@ -3,11 +3,27 @@
 {% block title %}小恐龙 DinoRoar - 秘密基地看板{% endblock %}
 
 {% block content %}
+<!-- 节日特惠活动横幅 (有活动时动态呈现) -->
+<div id="dashboardPromoBanner" style="display: none; margin-bottom: 20px; padding: 14px 20px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(245, 158, 11, 0.12)); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 1.6rem;">🎉</span>
+        <div>
+            <div id="dashboardPromoTitle" style="font-weight: 800; font-size: 0.98rem; color: #6d28d9;">节日特惠大促进行中！</div>
+            <div id="dashboardPromoDesc" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">快去商城挑选心仪的贴纸和画布吧～</div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <a href="/stickers" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6); color: white; text-decoration: none; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3);">🎨 贴纸特惠</a>
+        <a href="/canvases" style="background: linear-gradient(135deg, #60a5fa, #3b82f6); color: white; text-decoration: none; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">🖼️ 画布特惠</a>
+    </div>
+</div>
+
 <!-- 主看板 CSS Grid 2x2 跨行对齐网格 -->
 <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 25px; margin-bottom: 25px;">
     
     <!-- 1. 板块 1: 🥚 蛋能量 (左上第1行，与时光机等宽) -->
     <div class="card" style="grid-column: 1; grid-row: 1; padding: 22px; border: 1px solid var(--card-border); border-radius: 20px; position: relative;">
+
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 14px; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
@@ -145,5 +161,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/overview.js?v=202607211645"></script>
+<script src="/static/js/overview.js?v=202608152130"></script>
 {% endblock %}
+

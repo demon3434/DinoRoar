@@ -1,17 +1,63 @@
 let allConfig = [];
 let userInventory = { canvas_inventory: "", egg_energy: 0 };
 let activeSeriesId = null;
+let onlyOwned = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     initPage();
     initLightboxEvents();
 });
 
+function getTotalStats() {
+    const ownedSetIds = (userInventory.canvas_inventory || "")
+        .split(",")
+        .map(id => id.trim())
+        .filter(id => id.length > 0);
+    // 默认内置拥有 3001
+    if (!ownedSetIds.includes("3001")) ownedSetIds.push("3001");
+
+    let totalCount = 0;
+    let ownedDistinct = 0;
+    allConfig.forEach(series => {
+        if (series.sets) {
+            series.sets.forEach(set => {
+                totalCount++;
+                if (ownedSetIds.includes(String(set.id))) {
+                    ownedDistinct++;
+                }
+            });
+        }
+    });
+    return { ownedDistinct, totalCount, ownedSetIds };
+}
+
+function updateOnlyOwnedBtnState() {
+    const onlyOwnedBtn = document.getElementById("onlyOwnedBtn");
+    if (!onlyOwnedBtn) return;
+    if (onlyOwned) {
+        onlyOwnedBtn.classList.add("active");
+        onlyOwnedBtn.textContent = "✓ 已拥有";
+    } else {
+        onlyOwnedBtn.classList.remove("active");
+        onlyOwnedBtn.textContent = "已拥有";
+    }
+}
+
 async function initPage() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
+    const onlyOwnedBtn = document.getElementById("onlyOwnedBtn");
+    if (onlyOwnedBtn) {
+        onlyOwnedBtn.onclick = () => {
+            onlyOwned = !onlyOwned;
+            updateOnlyOwnedBtnState();
+            renderCanvasesGrid();
+        };
+    }
+
     try {
+        loadPromoBanner();
         // 1. 并发获取基础配置和用户资产
         const [configRes, inventoryRes] = await Promise.all([
             fetch("/api/canvases/config", {
@@ -43,6 +89,27 @@ async function initPage() {
     }
 }
 
+async function loadPromoBanner() {
+    try {
+        const res = await fetch('/api/promotions/active-summary');
+        if (!res.ok) return;
+        const promos = await res.json();
+        const bannerContainer = document.getElementById('promoBannerContainer');
+        const bannerText = document.getElementById('promoBannerText');
+        if (bannerContainer && bannerText && promos && promos.length > 0) {
+            const descList = promos.map(p => {
+                const rText = (p.rules_summary && p.rules_summary.length > 0) ? p.rules_summary.join('，') : p.description;
+                return rText ? `${p.name}（${rText}）` : p.name;
+            }).join('； ');
+            bannerText.textContent = `节日特惠活动进行中：${descList}`;
+            bannerContainer.style.display = 'flex';
+        }
+
+    } catch (e) {
+        console.error('加载横幅失败:', e);
+    }
+}
+
 function updateEggEnergyDisplay(energy) {
     const navEnergyEl = document.getElementById("navEggEnergy");
     if (navEnergyEl) navEnergyEl.textContent = energy;
@@ -52,6 +119,7 @@ function renderSeriesSidebar() {
     const sidebarList = document.getElementById("seriesNavList");
     if (!sidebarList) return;
 
+    const stats = getTotalStats();
     sidebarList.innerHTML = "";
     allConfig.forEach(series => {
         const item = document.createElement("div");
@@ -64,7 +132,8 @@ function renderSeriesSidebar() {
 
         const badge = document.createElement("span");
         badge.className = "series-badge";
-        badge.textContent = series.sets.length;
+        const ownedInSeries = (series.sets || []).filter(s => stats.ownedSetIds.includes(String(s.id))).length;
+        badge.textContent = `${ownedInSeries}/${series.sets.length}`;
 
         item.appendChild(nameSpan);
         item.appendChild(badge);
@@ -87,7 +156,13 @@ function selectSeries(seriesId) {
 
 function renderCanvasesGrid() {
     const grid = document.getElementById("canvasesGrid");
+    const panelStats = document.getElementById("panelStats");
     if (!grid) return;
+
+    const stats = getTotalStats();
+    if (panelStats) {
+        panelStats.textContent = `已收集 ${stats.ownedDistinct} 款 / 全馆共 ${stats.totalCount} 款`;
+    }
 
     grid.innerHTML = "";
     const activeSeries = allConfig.find(s => s.id === activeSeriesId);
@@ -96,18 +171,28 @@ function renderCanvasesGrid() {
         return;
     }
 
-    const ownedSetIds = userInventory.canvas_inventory
-        .split(",")
-        .map(id => id.trim())
-        .filter(id => id.length > 0);
+    let setsToRender = activeSeries.sets || [];
+    if (onlyOwned) {
+        setsToRender = setsToRender.filter(cset => stats.ownedSetIds.includes(String(cset.id)));
+    }
 
-    activeSeries.sets.forEach(cset => {
+    if (setsToRender.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 50px 20px;">
+                ${onlyOwned ? '该系列下暂无已拥有的画布，快去兑换吧！' : '该系列暂时还没有画布哦'}
+            </div>
+        `;
+        return;
+    }
+
+    setsToRender.forEach(cset => {
         const card = document.createElement("div");
         card.className = "canvas-card";
 
         // 取出该套画布下的所有图片实例，默认第一张为首图
         const instances = cset.instances || [];
-        const isOwned = ownedSetIds.includes(String(cset.id));
+        const isOwned = stats.ownedSetIds.includes(String(cset.id));
+
         const defaultInstance = instances.find(inst => inst.aspect_ratio === "16:9") || instances[0];
         const CACHE_VERSION = "202608111051";
         const defaultImgUrl = defaultInstance ? `${defaultInstance.image_url}?v=${CACHE_VERSION}` : "/static/images/default_canvases/default_canvas_16_9.png";
@@ -185,7 +270,11 @@ function renderCanvasesGrid() {
 
         const priceSpan = document.createElement("span");
         priceSpan.className = "canvas-price";
-        priceSpan.innerHTML = `🥚 ${cset.exchange_price} 能量`;
+        if (cset.is_on_sale && cset.original_price && cset.original_price > cset.exchange_price) {
+            priceSpan.innerHTML = `🥚 <strong style="color: #60a5fa; font-size: 1.05rem;">${cset.exchange_price}</strong> <span style="font-size: 0.75rem; text-decoration: line-through; opacity: 0.5; margin-left: 3px;">${cset.original_price}</span> <span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-size: 0.7rem; padding: 1px 5px; border-radius: 4px; font-weight: 800; margin-left: 4px;">特惠</span>`;
+        } else {
+            priceSpan.innerHTML = `🥚 ${cset.exchange_price} 能量`;
+        }
         actionArea.appendChild(priceSpan);
 
         const btn = document.createElement("button");
@@ -223,9 +312,23 @@ function renderEmptyState() {
 }
 
 async function performExchange(setId, setName, price) {
-    // 弹窗确认
-    const confirmed = await showConfirm(`确认使用 🥚${price} 蛋能量兑换解锁画布套《${setName}》吗？\n解锁后双端将即刻生效！`);
+    let targetSet = null;
+    allConfig.forEach(s => {
+        if (s.sets) {
+            const found = s.sets.find(st => st.id === setId);
+            if (found) targetSet = found;
+        }
+    });
+
+    let promptMsg = `确认使用 🥚${price} 蛋能量兑换解锁画布套《${setName}》吗？\n解锁后双端将即刻生效！`;
+    if (targetSet && targetSet.is_on_sale && targetSet.original_price && targetSet.original_price > price) {
+        const saved = targetSet.original_price - price;
+        promptMsg = `✨ 节日特惠兑换《${setName}》\n原价：${targetSet.original_price} 蛋能量\n特惠实付：${price} 蛋能量\n🎉 本次兑换为您立省 ${saved} 蛋能量！\n\n确认立即兑换吗？`;
+    }
+
+    const confirmed = await showConfirm(promptMsg);
     if (!confirmed) return;
+
 
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -243,16 +346,18 @@ async function performExchange(setId, setName, price) {
         if (response.ok) {
             userInventory = await response.json();
             updateEggEnergyDisplay(userInventory.egg_energy);
-            // 重新刷新网格
+            // 重新刷新侧边栏与网格
+            renderSeriesSidebar();
             renderCanvasesGrid();
-            showCustomAlert(`🎉 恭喜！兑换画布《${setName}》成功！`);
+            showToast(`🎉 恭喜！兑换画布《${setName}》成功！`, 'success');
+
         } else {
             const errData = await response.json();
-            showCustomAlert(`❌ 兑换失败: ${errData.detail || "服务器错误"}`);
+            showToast(`兑换失败: ${errData.detail || "服务器错误"}`, 'error');
         }
     } catch (e) {
         console.error("兑换画布请求失败", e);
-        showCustomAlert("❌ 兑换请求发送失败，请检查网络！");
+        showToast("兑换请求发送失败，请检查网络！", 'error');
     }
 }
 
@@ -265,8 +370,24 @@ function showConfirm(message) {
             return;
         }
 
-        document.getElementById("confirmModalMessage").textContent = message;
-        document.getElementById("confirmModalTitle").textContent = "确认兑换";
+        const titleEl = document.getElementById("confirmModalTitle");
+        const msgEl = document.getElementById("confirmModalMessage");
+        const okBtn = document.getElementById("confirmModalConfirmBtn");
+        const cancelBtn = document.getElementById("confirmModalCancelBtn");
+
+        if (titleEl) {
+            titleEl.textContent = "🎉 确认兑换";
+            titleEl.style.color = "var(--text-main)";
+        }
+        if (msgEl) {
+            msgEl.textContent = message;
+            msgEl.style.color = "var(--text-main)";
+        }
+        if (okBtn) {
+            okBtn.textContent = "✨ 立即兑换";
+            okBtn.style.background = "linear-gradient(135deg, #8b5cf6, #7c3aed)";
+            okBtn.style.color = "#ffffff";
+        }
         
         modal.style.display = "flex";
 
@@ -281,9 +402,6 @@ function showConfirm(message) {
             resolve(false);
         };
 
-        const okBtn = document.getElementById("confirmModalConfirmBtn");
-        const cancelBtn = document.getElementById("confirmModalCancelBtn");
-
         okBtn.addEventListener("click", handleOk);
         cancelBtn.addEventListener("click", handleCancel);
 
@@ -295,8 +413,11 @@ function showConfirm(message) {
 }
 
 function showCustomAlert(message) {
-    alert(message);
+    if (typeof showToast === 'function') {
+        showToast(message, 'info');
+    }
 }
+
 
 // ==================== 画布大图 Lightbox 预览逻辑 ====================
 let lightboxScale = 1;

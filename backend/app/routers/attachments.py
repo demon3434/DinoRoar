@@ -26,6 +26,22 @@ class CheckMd5Request(BaseModel):
     log_uuid: Optional[str] = None
     title: Optional[str] = None
 
+def _reward_media_bonus_if_first_attachment(db: Session, log_uuid: Optional[str], current_user: User, incoming_uuid: str):
+    """
+    当上传/关联首个多媒体附件到日记时，若该日记在新建同步时因网络时序未获得多媒体奖励，
+    在此自动为用户补发 20 蛋能量差额（将基础 10 蛋能量补齐至 30 蛋能量满额），并标记 media_rewarded = True。
+    后续无论对该日记进行多少次修改追加多媒体，均直接拦截，绝不重复发放。
+    """
+    if not log_uuid or not current_user:
+        return
+    log = db.query(Log).filter(Log.uuid == log_uuid, Log.user_id == current_user.id).first()
+    if log and not getattr(log, "media_rewarded", False):
+        log.media_rewarded = True
+        current_user.egg_energy = getattr(current_user, "egg_energy", 0) + 20
+        import logging
+        logging.getLogger(__name__).info(f"Sticker Economy: User {current_user.id} rewarded +20 bonus energy for first media attachment on log {log_uuid} (media_rewarded set to True)")
+
+
 @router.post("/check-md5")
 async def check_md5(
     payload: CheckMd5Request,
@@ -58,6 +74,7 @@ async def check_md5(
         existing_new.file_size = existing.file_size
         existing_new.md5 = payload.md5
         existing_new.title = payload.title or existing.title
+        _reward_media_bonus_if_first_attachment(db, payload.log_uuid, current_user, payload.uuid)
         db.commit()
         db.refresh(existing_new)
         return {"status": "exists", "id": existing_new.id, "uuid": existing_new.uuid, "remote_url": f"/api/attachments/download/{existing_new.uuid}"}
@@ -74,11 +91,13 @@ async def check_md5(
             title=payload.title or existing.title
         )
         db.add(new_attachment)
+        _reward_media_bonus_if_first_attachment(db, payload.log_uuid, current_user, payload.uuid)
         db.commit()
         db.refresh(new_attachment)
         return {"status": "exists", "id": new_attachment.id, "uuid": new_attachment.uuid, "remote_url": f"/api/attachments/download/{new_attachment.uuid}"}
 
 @router.post("/upload", response_model=AttachmentResponse)
+
 async def upload_attachment(
     file: UploadFile = File(...),
     uuid: str = Form(...),
@@ -165,6 +184,7 @@ async def upload_attachment(
         existing_attachment.md5 = md5
         if title is not None:
             existing_attachment.title = title
+        _reward_media_bonus_if_first_attachment(db, log_uuid, current_user, uuid)
         db.commit()
         db.refresh(existing_attachment)
         return existing_attachment
@@ -181,9 +201,11 @@ async def upload_attachment(
             title=title
         )
         db.add(new_attachment)
+        _reward_media_bonus_if_first_attachment(db, log_uuid, current_user, uuid)
         db.commit()
         db.refresh(new_attachment)
         return new_attachment
+
 
 @router.get("/download/{uuid}")
 async def download_attachment(

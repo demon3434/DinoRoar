@@ -1,7 +1,8 @@
 import logging
 import httpx
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
-from app.config import settings
+from ..config import settings
+
 
 logger = logging.getLogger("STTProxy")
 router = APIRouter(prefix="/api/stt", tags=["STT"])

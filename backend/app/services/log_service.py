@@ -114,9 +114,13 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
             has_media = db.query(Attachment).filter(Attachment.log_uuid == log_data.uuid).first() is not None
             if has_media:
                 earned_energy += 20
+                new_log.media_rewarded = True
+            else:
+                new_log.media_rewarded = False
                 
             current_user.egg_energy += earned_energy
-            logger.info(f"Sticker Economy: User {current_user.id} earned {earned_energy} energy for new log {log_data.uuid}")
+            logger.info(f"Sticker Economy: User {current_user.id} earned {earned_energy} energy for new log {log_data.uuid} (media_rewarded={new_log.media_rewarded})")
+
 
             stickers_in_log = re.findall(r'\[sticker:([^:]+):[0-9.-]+,[0-9.-]+\]', log_data.content)
             if stickers_in_log:

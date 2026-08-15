@@ -1,10 +1,11 @@
 const stickersApi = {
     async fetchConfig() {
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/stickers/config', { headers: { 'Authorization': 'Bearer ' + token } });
+        const res = await fetch('/api/stickers/config?for_admin=true', { headers: { 'Authorization': 'Bearer ' + token } });
         if (!res.ok) throw new Error("拉取配置数据失败");
         return await res.json();
     },
+
 
     async createSeries(name, sortOrder) {
         const token = localStorage.getItem('token');

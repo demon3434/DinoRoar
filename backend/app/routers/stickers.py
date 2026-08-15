@@ -30,12 +30,14 @@ router = APIRouter(prefix="/api/stickers", tags=["Stickers"])
 
 @router.get("/config", response_model=List[StickerSeriesResponse])
 async def get_stickers_config(
+    for_admin: bool = False,
     db: Session = Depends(get_db)
 ):
     """
     获取系统中所有可用的贴纸系列及内部嵌套的贴纸基础配置清单
     """
-    return stickers_service.get_nested_stickers_config(db)
+    return stickers_service.get_nested_stickers_config(db, apply_promo=not for_admin)
+
 
 @router.get("/inventory", response_model=StickerInventoryResponse)
 async def get_sticker_inventory(
@@ -79,16 +81,32 @@ async def exchange_sticker(
     db: Session = Depends(get_db)
 ):
     """
-    自主消耗蛋能量兑换贴纸
+    自主消耗蛋能量兑换贴纸（向后兼容适配层，内部代理至统一 ShopService 计价与结算）
     """
-    try:
-        user = stickers_service.exchange_sticker_transaction(db, user_id=current_user.id, sticker_id=payload.sticker_id)
-        return user
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    from ..services.shop.items import sync_asset_shop_item, exchange_shop_items
+    from ..models import StickerConfig
+    
+    sticker = db.query(StickerConfig).filter(StickerConfig.id == payload.sticker_id, StickerConfig.is_deleted == False).first()
+    if not sticker:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="贴纸未找到或已删除")
+    
+    # 确保 ShopItem 存在
+    shop_item = sync_asset_shop_item(
+        db=db,
+        item_type="STICKER",
+        target_id=sticker.id,
+        original_price=sticker.exchange_price or 20,
+        sort_order=sticker.sort_order,
+        is_active=sticker.is_active
+    )
+    
+    res = exchange_shop_items(db, user_id=current_user.id, shop_item_ids=[shop_item.id])
+    db.refresh(current_user)
+    return {
+        "sticker_inventory": current_user.sticker_inventory,
+        "egg_energy": current_user.egg_energy
+    }
+
 
 @router.post("/admin/series", response_model=StickerSeriesResponse)
 async def create_sticker_series(
@@ -181,6 +199,18 @@ async def upload_sticker(
     db.add(sticker_cfg)
     db.flush()
     stickers_service.reorder_stickers_in_series(db, series_id, sticker_cfg.id, sort_order)
+    
+    # 同步写入统一商品销售表
+    from ..services.shop.items import sync_asset_shop_item
+    sync_asset_shop_item(
+        db=db,
+        item_type="STICKER",
+        target_id=sticker_cfg.id,
+        original_price=exchange_price,
+        sort_order=sort_order,
+        is_active=True
+    )
+    
     db.commit()
     db.refresh(sticker_cfg)
     return sticker_cfg
@@ -273,6 +303,9 @@ async def delete_admin_sticker(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
     try:
         stickers_service.soft_delete_sticker(db, sticker_id)
+        from ..models import ShopItem
+        db.query(ShopItem).filter(ShopItem.item_type == "STICKER", ShopItem.target_id == sticker_id).update({"is_deleted": True, "is_active": False})
+        db.commit()
         return {"status": "success", "message": "贴纸已成功软删除"}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -337,9 +370,20 @@ async def update_admin_sticker(
             description, 
             image_url
         )
+        # 同步更新统一商品销售表
+        from ..services.shop.items import sync_asset_shop_item
+        sync_asset_shop_item(
+            db=db,
+            item_type="STICKER",
+            target_id=sticker.id,
+            original_price=exchange_price,
+            sort_order=sort_order,
+            is_active=sticker.is_active
+        )
         return sticker
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 @router.get("/export")
 async def export_stickers(

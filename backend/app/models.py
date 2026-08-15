@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index, UniqueConstraint
 from sqlalchemy.orm import relationship as orm_relationship
 from .database import Base
 
@@ -83,6 +83,8 @@ class Log(Base):
     
     is_deleted = Column(Boolean, default=False)
     version = Column(Integer, default=1, nullable=False)
+    media_rewarded = Column(Boolean, default=False, nullable=False)
+
 
     # Relationships
     user = orm_relationship("User", back_populates="logs")
@@ -250,6 +252,65 @@ class LogCanvas(Base):
     log_uuid = Column(String, ForeignKey("logs.uuid", ondelete="CASCADE"), primary_key=True)
     canvas_instance_id = Column(Integer, ForeignKey("canvas_instances.id", ondelete="SET NULL"), nullable=True)
     canvas_aspect_ratio = Column(String, nullable=False, default="2:1")  # "16:9", "4:3", "1:1", "2:1"
+
+
+class ShopItem(Base):
+    """
+    统一商品销售表：自增主键从 7001 起步
+    统一管理手账商城的商品售价、上架与结算属性，与领域资产物理表彻底解耦
+    """
+    __tablename__ = "shop_items"
+
+    id = Column(Integer, primary_key=True, index=True)  # 7001 起步
+    item_type = Column(String, nullable=False, index=True)  # "STICKER" | "CANVAS_SET" (未来扩展 "FONT" 等)
+    target_id = Column(Integer, nullable=False, index=True)  # 关联 sticker_configs.id 或 canvas_sets.id
+    original_price = Column(Integer, nullable=False, default=20)  # 基础蛋能量售价
+    sort_order = Column(Integer, nullable=False, default=0)  # 商城展示排序
+    is_active = Column(Boolean, nullable=False, default=True)  # 是否上架
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class Promotion(Base):
+    """
+    促销活动主表：自增主键从 5001 起步
+    """
+    __tablename__ = "promotions"
+
+    id = Column(Integer, primary_key=True, index=True)  # 5001 起步
+    name = Column(String, nullable=False)  # 活动名称，如 "2026儿童节手账狂欢"
+    description = Column(String, nullable=True)  # 活动文案说明
+    start_time = Column(DateTime, nullable=False)  # 生效开始时间 (UTC)
+    end_time = Column(DateTime, nullable=False)  # 生效结束时间 (UTC)
+    is_active = Column(Boolean, nullable=False, default=True)  # 启用/停用开关
+    is_deleted = Column(Boolean, nullable=False, default=False)  # 软删除
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    targets = orm_relationship("PromotionTarget", back_populates="promotion", cascade="all, delete-orphan")
+
+
+class PromotionTarget(Base):
+    """
+    促销适用目标与规则表：自增主键从 6001 起步
+    """
+    __tablename__ = "promotion_targets"
+
+    id = Column(Integer, primary_key=True, index=True)  # 6001 起步
+    promotion_id = Column(Integer, ForeignKey("promotions.id", ondelete="CASCADE"), nullable=False)
+    
+    # 作用范围: "ALL" | "ITEM_TYPE" | "SERIES" | "SHOP_ITEM"
+    target_scope = Column(String, nullable=False, default="ALL")
+    target_type = Column(String, nullable=True)  # "STICKER" | "CANVAS_SET"
+    target_id = Column(Integer, nullable=True)  # series_id 或 shop_items.id
+    
+    # 优惠方式
+    discount_rate = Column(Float, nullable=True)  # 折扣率（如 0.80）
+    fixed_price = Column(Integer, nullable=True)  # 单品一口价（蛋能量整数）
+    
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    promotion = orm_relationship("Promotion", back_populates="targets")
+
 
 
 

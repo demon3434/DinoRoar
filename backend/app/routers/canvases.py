@@ -50,11 +50,15 @@ class CanvasSetSortPayload(BaseModel):
 
 
 @router.get("/config", response_model=List[CanvasSeriesResponse])
-async def get_canvases_config(db: Session = Depends(get_db)):
+async def get_canvases_config(
+    for_admin: bool = False,
+    db: Session = Depends(get_db)
+):
     """
     获取系统中所有可用的画布系列及内部嵌套的画布套、图片实例列表
     """
-    return canvases_service.get_canvases_config(db, only_active=True)
+    return canvases_service.get_canvases_config(db, only_active=True, apply_promo=not for_admin)
+
 
 
 @router.get("/inventory", response_model=CanvasSyncPayload)
@@ -89,39 +93,42 @@ async def sync_canvas_inventory(
 
 
 @router.post("/exchange", response_model=CanvasSyncPayload)
+
 async def exchange_canvas(
     payload: CanvasExchangeRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    自主消耗蛋能量购买兑换整套背景画布
+    自主消耗蛋能量购买兑换整套背景画布（向后兼容适配层，内部代理至统一 ShopService 计价与结算）
     """
-    cset = db.query(CanvasSet).filter(CanvasSet.id == payload.canvas_set_id, CanvasSet.is_deleted == False, CanvasSet.is_active == True).first()
+    from ..services.shop.items import sync_asset_shop_item, exchange_shop_items
+    
+    cset = db.query(CanvasSet).filter(CanvasSet.id == payload.canvas_set_id, CanvasSet.is_deleted == False).first()
     if not cset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="背景画布不存在或已被下架"
         )
 
-    inventory_list = [x.strip() for x in current_user.canvas_inventory.split(",") if x.strip()]
+    inventory_list = [x.strip() for x in (current_user.canvas_inventory or "").split(",") if x.strip()]
     if str(cset.id) in inventory_list:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="您已拥有该背景画布套件，无需重复兑换"
         )
 
-    if current_user.egg_energy < cset.exchange_price:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"能量不足！兑换需要 {cset.exchange_price} 蛋能量，当前仅有 {current_user.egg_energy}"
-        )
+    # 确保 ShopItem 存在
+    shop_item = sync_asset_shop_item(
+        db=db,
+        item_type="CANVAS_SET",
+        target_id=cset.id,
+        original_price=cset.exchange_price or 50,
+        sort_order=cset.sort_order,
+        is_active=cset.is_active
+    )
 
-    current_user.egg_energy -= cset.exchange_price
-    inventory_list.append(str(cset.id))
-    current_user.canvas_inventory = ",".join(inventory_list)
-
-    db.commit()
+    exchange_shop_items(db, user_id=current_user.id, shop_item_ids=[shop_item.id])
     db.refresh(current_user)
     return {
         "canvas_inventory": current_user.canvas_inventory,
@@ -141,7 +148,8 @@ async def get_admin_canvases_config(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    return canvases_service.get_canvases_config(db, only_active=False)
+    return canvases_service.get_canvases_config(db, only_active=False, apply_promo=False)
+
 
 
 @router.post("/admin/series", response_model=CanvasSeriesResponse)
@@ -170,7 +178,7 @@ async def sort_canvas_series(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
     canvases_service.sort_canvas_series(db, payload.series_ids)
-    return {"detail": "分类系列排序更新成功"}
+    return {"detail": "系列分类排序更新成功"}
 
 
 @router.put("/admin/series/{series_id}", response_model=CanvasSeriesResponse)
@@ -228,7 +236,7 @@ async def create_canvas_set(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    return canvases_service.create_canvas_set(
+    res = canvases_service.create_canvas_set(
         db,
         payload.series_id,
         payload.name,
@@ -236,6 +244,9 @@ async def create_canvas_set(
         payload.exchange_price,
         payload.sort_order
     )
+    from ..services.shop.items import sync_asset_shop_item
+    sync_asset_shop_item(db, item_type="CANVAS_SET", target_id=res.id, original_price=payload.exchange_price, sort_order=payload.sort_order)
+    return res
 
 
 @router.put("/admin/sets/sort")
@@ -261,11 +272,11 @@ async def update_canvas_set(
     db: Session = Depends(get_db)
 ):
     """
-    修改商品套基本信息 (仅限管理员)
+    修改画布商品套信息 (仅限管理员)
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    return canvases_service.update_canvas_set(
+    res = canvases_service.update_canvas_set(
         db,
         set_id,
         payload.series_id,
@@ -274,6 +285,9 @@ async def update_canvas_set(
         payload.exchange_price,
         payload.sort_order
     )
+    from ..services.shop.items import sync_asset_shop_item
+    sync_asset_shop_item(db, item_type="CANVAS_SET", target_id=set_id, original_price=payload.exchange_price, sort_order=payload.sort_order)
+    return res
 
 
 @router.post("/admin/sets/{set_id}/toggle-active", response_model=CanvasSetResponse)
@@ -287,7 +301,11 @@ async def toggle_canvas_set_active(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    return canvases_service.toggle_canvas_set_active(db, set_id)
+    res = canvases_service.toggle_canvas_set_active(db, set_id)
+    from ..models import ShopItem
+    db.query(ShopItem).filter(ShopItem.item_type == "CANVAS_SET", ShopItem.target_id == set_id).update({"is_active": res.is_active})
+    db.commit()
+    return res
 
 
 @router.delete("/admin/sets/{set_id}")
@@ -302,7 +320,11 @@ async def delete_canvas_set(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
     canvases_service.delete_canvas_set(db, set_id)
+    from ..models import ShopItem
+    db.query(ShopItem).filter(ShopItem.item_type == "CANVAS_SET", ShopItem.target_id == set_id).update({"is_deleted": True, "is_active": False})
+    db.commit()
     return {"detail": "商品套件及内部图片实例已成功软删除"}
+
 
 
 @router.post("/admin/upload", response_model=CanvasInstanceResponse)

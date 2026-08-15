@@ -401,7 +401,41 @@
         transition: transform 0.05s ease-out;
         transform-origin: center center;
     }
+
+    .owned-filter-btn {
+        border-radius: 50px;
+        padding: 5px 14px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--card-border);
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        user-select: none;
+    }
+    .owned-filter-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-main);
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+    .owned-filter-btn.active {
+        background: rgba(16, 185, 129, 0.18);
+        color: #10b981;
+        border-color: #10b981;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+    }
+
+    .panel-stats {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-weight: 700;
+    }
 </style>
+
 {% endblock %}
 
 {% block content %}
@@ -418,10 +452,21 @@
 
     <!-- 2. 右侧画布主面板 -->
     <div class="canvas-main-panel">
+        <!-- 节日活动横幅 -->
+        <div id="promoBannerContainer" style="display: none; margin-bottom: 16px; padding: 12px 18px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(167, 139, 250, 0.08)); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 14px; font-size: 0.9rem; color: #6d28d9; font-weight: 700; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.08);">
+            <span style="font-size: 1.2rem;">🎉</span> <span id="promoBannerText">节日特惠活动进行中</span>
+        </div>
+
         <div class="panel-header">
             <h2 class="panel-title" id="panelTitle">
                 <span>🖼️</span> 画布商城
             </h2>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="onlyOwnedBtn" class="owned-filter-btn" type="button">已拥有</button>
+                <div class="panel-stats" id="panelStats">
+                    已收集 0 款 / 全馆共 0 款
+                </div>
+            </div>
         </div>
 
         <!-- 画布网格区 -->
@@ -456,5 +501,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/canvases.js?v=202608111051"></script>
+<script src="/static/js/canvases.js?v=202608160145"></script>
 {% endblock %}
+
+
+

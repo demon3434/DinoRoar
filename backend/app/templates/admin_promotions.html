@@ -1,0 +1,429 @@
+{% extends "admin_base.html" %}
+
+{% block title %}促销活动管理 - 恐龙风暴 DinoRoar{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/admin_stickers.css?v=20260815">
+<style>
+/* 促销活动专属现代视觉风格 - 严格契合全站主题系统 */
+.promo-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.promo-table-card {
+    background: var(--card-bg, rgba(255, 255, 255, 0.8));
+    border: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.promo-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+.promo-table th {
+    padding: 14px 18px;
+    background: rgba(0, 0, 0, 0.03);
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
+    white-space: nowrap;
+}
+
+.promo-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--card-border, rgba(0, 0, 0, 0.05));
+    color: var(--text-main, #1e293b);
+    vertical-align: middle;
+}
+
+.promo-table tr:last-child td {
+    border-bottom: none;
+}
+
+.promo-table tr:hover {
+    background: rgba(139, 92, 246, 0.03);
+}
+
+/* 状态标签 */
+.promo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.promo-badge.active {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.promo-badge.upcoming {
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.promo-badge.ended {
+    background: rgba(156, 163, 175, 0.12);
+    color: #6b7280;
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.promo-badge.disabled {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* 规则配置卡片 */
+.rule-item-box {
+    background: var(--bg-surface, rgba(0, 0, 0, 0.02));
+    border: 1px solid var(--card-border, rgba(0, 0, 0, 0.1));
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.rule-item-box:hover {
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.rule-remove-btn {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.rule-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* 选定商品微卡片展示 */
+.selected-target-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-top: 6px;
+}
+
+.selected-target-img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.selected-target-info {
+    flex: 1;
+    overflow: hidden;
+}
+
+.selected-target-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-main, #1e293b);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.selected-target-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted, #64748b);
+}
+
+/* Switch 开关 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.18);
+    transition: .3s;
+    border-radius: 22px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #10b981;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* 商品选择抽屉网格 */
+.picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 6px 2px;
+}
+
+.picker-item-card {
+    background: var(--bg-surface, rgba(0, 0, 0, 0.02));
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.picker-item-card:hover {
+    transform: translateY(-2px);
+    background: rgba(139, 92, 246, 0.05);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.picker-item-card.selected {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+}
+
+.picker-item-img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    margin-bottom: 8px;
+}
+
+.picker-item-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-main, #1e293b);
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 2px;
+}
+
+.picker-item-price {
+    font-size: 0.75rem;
+    color: #8b5cf6;
+    font-weight: 700;
+}
+
+/* 系列筛选胶囊 */
+.series-pill-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    scrollbar-width: thin;
+}
+
+.series-pill {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-muted, #64748b);
+    cursor: pointer;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.series-pill:hover {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+}
+
+.series-pill.active {
+    background: #8b5cf6;
+    color: white;
+    border-color: #8b5cf6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 6px;">
+    <!-- 顶部标题与操作栏 -->
+    <div class="promo-page-header">
+        <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-main); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+                🎉 节日促销活动管理
+            </h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+                配置手账商城的限时特惠活动，支持全场通用折扣、分类/系列折扣及单品一口价
+            </p>
+        </div>
+        <button class="btn btn-primary-purple" onclick="openCreatePromotionModal()" style="height: 38px; padding: 0 16px; font-weight: 700; white-space: nowrap;">
+            <span>➕</span> 创建新促销活动
+        </button>
+    </div>
+
+    <!-- 活动列表容器 -->
+    <div id="promotionsListContainer">
+        <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+            正在加载促销活动...
+        </div>
+    </div>
+</div>
+
+<!-- 1. 创建/编辑促销活动弹窗 -->
+<div id="promoModal" class="modal" style="display: none; z-index: 1000;">
+    <div class="modal-content" style="max-width: 660px; width: 94%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; padding: 20px 24px; box-sizing: border-box;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-shrink: 0; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border);">
+            <span id="promoModalTitle" style="font-weight: 800; font-size: 1.15rem; color: var(--text-main);">创建促销活动</span>
+            <span class="modal-close-icon" onclick="closePromoModal()" title="关闭">✕</span>
+        </div>
+        
+        <div style="padding-right: 4px; overflow-y: auto; flex: 1;">
+            <form id="promoForm" onsubmit="event.preventDefault(); submitPromoForm();">
+                <input type="hidden" id="promoId">
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px;">活动名称 *</label>
+                    <input type="text" id="promoName" class="form-control" placeholder="例如：2026儿童节手账大促" required>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px;">活动文案说明（将在商城顶部横幅展示）</label>
+                    <textarea id="promoDesc" class="form-control" rows="2" placeholder="例如：好好学习，天天向上，贴纸画布全场5折！"></textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="display: block; margin-bottom: 6px;">生效开始时间 *</label>
+                        <input type="datetime-local" id="promoStartTime" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="display: block; margin-bottom: 6px;">生效结束时间 *</label>
+                        <input type="datetime-local" id="promoEndTime" class="form-control" required>
+                    </div>
+                </div>
+
+                <!-- 规则动态配置区 -->
+                <div style="margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main);">优惠规则配置</span>
+                        <button type="button" class="btn-outline-purple" onclick="addRuleRow()" style="padding: 4px 12px; font-size: 0.8rem; height: 30px;">
+                            ➕ 添加规则
+                        </button>
+                    </div>
+                    <div id="rulesContainer">
+                        <!-- 动态规则行 -->
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--card-border); display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" class="btn-outline-purple" onclick="closePromoModal()" style="padding: 6px 18px;">取消</button>
+            <button type="button" class="btn btn-primary-purple" onclick="submitPromoForm()" style="padding: 6px 20px;">保存活动</button>
+        </div>
+    </div>
+</div>
+
+<!-- 2. 优惠系列可视化选择器弹出层 (Series Picker) -->
+<div id="seriesPickerModal" class="modal" style="display: none; z-index: 1100;">
+    <div class="modal-content" style="max-width: 780px; width: 95%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 20px 24px; box-sizing: border-box;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-shrink: 0; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border);">
+            <span id="pickerModalTitle" style="font-weight: 800; font-size: 1.15rem; color: var(--text-main);">📁 选择优惠系列</span>
+            <span class="modal-close-icon" onclick="closeSeriesPicker()" title="关闭">✕</span>
+        </div>
+
+        <!-- 筛选与搜索工具条 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--card-border); padding-bottom: 8px;">
+            <!-- 系列大类切换页签 -->
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="series-pill active" id="pickerTabStickers" onclick="switchSeriesPickerType('STICKER')">🎨 贴纸系列</button>
+                <button type="button" class="series-pill" id="pickerTabCanvases" onclick="switchSeriesPickerType('CANVAS_SET')">🖼️ 画布系列</button>
+            </div>
+            <input type="text" id="pickerSearchInput" class="form-control" placeholder="🔍 快速搜索系列名称..." style="width: 220px; height: 32px; font-size: 0.8rem; padding: 4px 10px;" oninput="renderSeriesPickerGrid()">
+        </div>
+
+        <!-- 系列网格展示区 -->
+        <div class="picker-grid" id="pickerGridContainer" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+            <!-- JS 动态注入系列卡片 -->
+        </div>
+
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+            <div id="pickerSelectedHint" style="font-size: 0.85rem; color: var(--text-muted);">
+                尚未选择系列
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn-outline-purple" onclick="closeSeriesPicker()" style="padding: 6px 16px;">取消</button>
+                <button type="button" class="btn btn-primary-purple" onclick="confirmSeriesSelection()" style="padding: 6px 20px;">选定带回</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/admin_promotions.js?v=202608160345"></script>
+{% endblock %}
+

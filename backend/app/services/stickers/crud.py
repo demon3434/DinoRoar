@@ -6,10 +6,17 @@ from sqlalchemy.orm import Session
 from ...models import StickerSeries, StickerConfig
 
 
-def get_nested_stickers_config(db: Session):
+def get_nested_stickers_config(db: Session, apply_promo: bool = True):
     """
     拉取按系列分类的嵌套贴纸列表，过滤掉软删除记录，按 sort_order 升序排序
+    apply_promo: True 则 exchange_price 为当前促销实付价；False 则为基础原价（供 Admin 端使用）
     """
+    from ..shop.pricing import calculate_item_price
+    from ..shop.promotions import get_active_promotion_targets
+    from ...models import ShopItem
+
+    active_targets = get_active_promotion_targets(db) if apply_promo else []
+
     series_list = db.query(StickerSeries).filter(
         StickerSeries.is_deleted == False
     ).order_by(StickerSeries.sort_order.asc()).all()
@@ -20,9 +27,30 @@ def get_nested_stickers_config(db: Session):
             StickerConfig.series_id == s.id,
             StickerConfig.is_deleted == False
         ).order_by(StickerConfig.sort_order.asc()).all()
+
+        for st in stickers:
+            shop_item = db.query(ShopItem).filter(
+                ShopItem.item_type == "STICKER",
+                ShopItem.target_id == st.id
+            ).first()
+            orig = shop_item.original_price if shop_item else (st.exchange_price or 20)
+            item_id = shop_item.id if shop_item else 7000 + st.id
+            price, is_sale = calculate_item_price(
+                original_price=orig,
+                item_type="STICKER",
+                shop_item_id=item_id,
+                series_id=s.id,
+                active_targets=active_targets
+            )
+            st.original_price = orig
+            st.is_on_sale = is_sale
+            st.exchange_price = price if apply_promo else orig
+
         s.stickers = stickers
         results.append(s)
     return results
+
+
 
 
 def reorder_stickers_in_series(db: Session, series_id: int, current_sticker_id: int, desired_sort_order: int):
