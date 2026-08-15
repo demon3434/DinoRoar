@@ -372,6 +372,31 @@ select.form-control option {
     color: var(--text-main);
 }
 
+.modal-close-icon {
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+    font-size: 1.1rem;
+    font-weight: 800;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.modal-close-icon:hover {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+    color: #ffffff !important;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+}
+
 .modal-actions {
     display: flex;
     justify-content: flex-end;

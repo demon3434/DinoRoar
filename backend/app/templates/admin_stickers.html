@@ -38,8 +38,8 @@
 </div>
 
 <div class="modal" id="folderDetailModal" style="display: none; z-index: 1000;">
-    <div class="modal-content" style="max-width: 960px; width: 95%;">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+    <div class="modal-content" style="max-width: 960px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; padding: 18px 24px; box-sizing: border-box;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-shrink: 0; margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--card-border);">
             <span id="detailModalTitle" style="font-weight: 800; font-size: 1.15rem;">📁 文件夹贴纸详情</span>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <!-- 详情弹窗平时操作组 -->
@@ -55,10 +55,11 @@
                     <button class="btn" id="btnConfirmBatchDeleteStickers" style="margin: 0; background: #ef4444; border-color: #ef4444; color: #fff; font-size: 0.78rem; padding: 4px 12px; height: 32px; font-weight: 800;" onclick="handleConfirmBatchDeleteStickersSubmit()">🔥 确认删除 (0)</button>
                     <button class="logout-btn" style="margin: 0; font-size: 0.78rem; padding: 4px 12px; height: 32px;" onclick="exitStickerBatchDeleteMode()">退出批量删除</button>
                 </div>
+                <!-- 右上角红叉关闭按钮 -->
+                <span class="modal-close-icon" onclick="closeFolderDetailModal()" title="关闭">✕</span>
             </div>
         </div>
-        <div class="sticker-list-grid" id="stickerDetailGrid" style="margin-top: 10px;"></div>
-        <div class="modal-actions" style="margin-top: 25px;"><button class="logout-btn" onclick="closeFolderDetailModal()">关闭</button></div>
+        <div class="sticker-list-grid" id="stickerDetailGrid" style="flex: 1; overflow-y: auto; min-height: 0; margin-top: 6px;"></div>
     </div>
 </div>
 
@@ -239,8 +240,8 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/admin_stickers_api.js?v=202608150840"></script>
-<script src="/static/js/admin_stickers_lightbox.js?v=202608150840"></script>
-<script src="/static/js/admin_stickers_drag.js?v=202608150840"></script>
-<script src="/static/js/admin_stickers.js?v=202608150840"></script>
+<script src="/static/js/admin_stickers_api.js?v=202608151033"></script>
+<script src="/static/js/admin_stickers_lightbox.js?v=202608151033"></script>
+<script src="/static/js/admin_stickers_drag.js?v=202608151033"></script>
+<script src="/static/js/admin_stickers.js?v=202608151033"></script>
 {% endblock %}

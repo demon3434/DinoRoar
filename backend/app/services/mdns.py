@@ -15,43 +15,56 @@ class ServiceDiscoveryBroadcaster:
 
     def start(self, host: str, port: int) -> bool:
         """
-        Starts the mDNS broadcaster using the configured host and port.
+        Starts or restarts the mDNS broadcaster using the configured host and port.
         """
         self.stop()  # Ensure previously running instance is stopped
 
-        if not host.strip():
+        if not host or not host.strip():
             logger.warning("mDNS: No host IP configured. Skipping broadcast.")
             return False
 
         self.active_host = host.strip()
-        self.active_port = port
+        self.active_port = int(port)
 
         try:
             self.zc = Zeroconf(ip_version=IPVersion.V4Only)
             
-            # Zeroconf ServiceInfo expects the IP addresses as a list of bytes or strings
             try:
                 ip_bytes = socket.inet_aton(self.active_host)
             except OSError:
                 logger.error(f"mDNS: Invalid IP address format: {self.active_host}")
                 return False
 
-            desc = {"version": "1.0", "path": "/api"}
-            
-            # The service name must be unique. Let's append host/port or a tag.
-            service_name = f"{settings.service_discovery_name}.{settings.service_discovery_type}"
+            service_type = settings.service_discovery_type.strip()
+            if not service_type.endswith("."):
+                service_type = f"{service_type}."
+            if not service_type.endswith(".local."):
+                if service_type.endswith(".local"):
+                    service_type = f"{service_type}."
+                else:
+                    service_type = f"{service_type.rstrip('.')}local."
+
+            instance_name = f"{settings.service_discovery_name}.{service_type}"
+
+            properties = {
+                b"host": self.active_host.encode("utf-8"),
+                b"mappedPort": str(self.active_port).encode("utf-8"),
+                b"url": f"http://{self.active_host}:{self.active_port}".encode("utf-8"),
+                b"version": b"1.0",
+                b"path": b"/api",
+            }
 
             self.info = ServiceInfo(
-                type_=settings.service_discovery_type,
-                name=service_name,
+                type_=service_type,
+                name=instance_name,
                 addresses=[ip_bytes],
                 port=self.active_port,
-                properties=desc,
+                properties=properties,
                 server=f"{settings.service_discovery_name.lower()}.local."
             )
 
-            logger.info(f"mDNS: Registering service {service_name} on {self.active_host}:{self.active_port}")
-            self.zc.register_service(self.info)
+            logger.info(f"mDNS: Registering service {instance_name} at {self.active_host}:{self.active_port}")
+            self.zc.register_service(self.info, allow_name_change=True)
             return True
 
         except Exception as e:
@@ -80,3 +93,4 @@ class ServiceDiscoveryBroadcaster:
                 self.active_host = None
                 self.active_port = None
                 logger.info("mDNS: Service discovery stopped.")
+

@@ -10,12 +10,12 @@ services:
     container_name: dinoroar-app
     restart: unless-stopped
     ports:
-      # 宿主机 HTTP & mDNS UDP 端口映射
+      # 宿主机 HTTP 单端口映射
       - "${APP_HTTP_PORT:-8080}:8080"
-      - "${APP_UDP_PORT:-8090}:8090/udp"
     environment:
       - TZ=${TZ:-Asia/Shanghai}
       - WEB_PORT=8080
+      - SERVICE_ADVERTISE_HOST=${SERVICE_ADVERTISE_HOST:-}
       - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
       - STT_API_URL=http://stt:18000/api/transcribe
       - UPLOAD_DIR=/workspace/uploads
@@ -33,6 +33,7 @@ services:
         max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
+      - dinoroar_mdns
 
   # DinoRoar STT 语音识别服务 (本地测试版)
   stt:
@@ -61,3 +62,9 @@ networks:
   dinoroar_net:
     name: dinoroar_net
     driver: bridge
+  dinoroar_mdns:
+    name: dinoroar_mdns
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-dinoroar
+

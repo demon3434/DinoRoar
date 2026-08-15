@@ -265,10 +265,10 @@
     /* 详情弹窗中的套件卡片 */
     .sets-list-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
-        margin-top: 10px;
-        padding: 8px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-top: 6px;
+        padding: 6px 8px;
     }
 
     .sets-list-grid::-webkit-scrollbar {
@@ -288,14 +288,14 @@
     .set-detail-card {
         background: rgba(255,255,255,0.02);
         border: 1px solid var(--card-border);
-        border-radius: 14px;
-        padding: 10px;
+        border-radius: 12px;
+        padding: 8px 8px 6px 8px;
         display: flex;
         flex-direction: column;
         cursor: grab;
         transition: all 0.2s;
         position: relative;
-        height: 200px;
+        height: 188px;
         justify-content: space-between;
         box-sizing: border-box;
     }
@@ -411,7 +411,7 @@
         display: flex;
         gap: 3px;
         width: 100%;
-        margin: 6px 0;
+        margin: 3px 0 2px 0;
     }
 
     .btn-ratio-switch {
@@ -524,8 +524,8 @@
         box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
     }
 
-    /* 弹窗设计 */
-    .admin-modal {
+    /* 弹窗设计：全面适配全局主题变量 */
+    .admin-modal, .modal {
         display: none;
         position: fixed;
         z-index: 2000;
@@ -533,14 +533,16 @@
         top: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0,0,0,0.8);
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         align-items: center;
         justify-content: center;
-        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
     }
 
     .modal-content {
-        background: #18181b;
+        background: var(--card-bg);
         border: 1px solid var(--card-border);
         border-radius: 24px;
         padding: 25px;
@@ -548,7 +550,11 @@
         max-width: 90%;
         max-height: 90%;
         overflow-y: auto;
-        box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+        color: var(--text-main);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        box-sizing: border-box;
     }
 
     .modal-header {
@@ -754,19 +760,19 @@
         cursor: pointer !important;
     }
 
-    /* 自定义底图卡片底部操作按钮样式，解决拥挤、过小、不易点击的问题 */
+    /* 自定义底图卡片底部操作按钮样式，恢复紧凑适中尺寸 */
     .set-card-btn-bar {
         display: flex;
-        gap: 8px;
+        gap: 5px;
         width: 100%;
-        margin-top: 10px;
+        margin-top: 4px;
     }
 
     .set-card-btn-bar .btn-icon {
         flex: 1;
-        height: 36px;
-        font-size: 1.05rem;
-        border-radius: 8px;
+        height: 28px;
+        font-size: 0.85rem;
+        border-radius: 6px;
         border: 1px solid var(--card-border);
         background: rgba(255, 255, 255, 0.03);
         color: var(--text-main);
@@ -777,6 +783,14 @@
         transition: all 0.2s ease;
         padding: 0;
         outline: none;
+    }
+
+    .modal-close-icon:hover {
+        background: #ef4444 !important;
+        border-color: #ef4444 !important;
+        color: #ffffff !important;
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
     }
 
     .set-card-btn-bar .btn-icon:hover:not(:disabled) {
@@ -825,6 +839,111 @@
         cursor: not-allowed;
         background: rgba(255, 255, 255, 0.01) !important;
         border-color: var(--card-border) !important;
+    }
+
+    /* 亮色全系主题细致适配 (温暖橙黄/北欧冷灰/樱花粉/枫叶黄/马卡龙各色) */
+    :root.theme-light-warm .set-detail-card,
+    :root.theme-nordic-cool .set-detail-card,
+    :root.theme-sakura-peach .set-detail-card,
+    :root.theme-autumn-maple .set-detail-card,
+    :root.theme-macaron-pink .set-detail-card,
+    :root.theme-macaron-blue .set-detail-card,
+    :root.theme-macaron-green .set-detail-card,
+    :root.theme-macaron-yellow .set-detail-card,
+    :root.theme-macaron-purple .set-detail-card,
+    :root.theme-macaron-orange .set-detail-card {
+        background: rgba(255, 255, 255, 0.75) !important;
+        border-color: rgba(0, 0, 0, 0.1) !important;
+    }
+
+    :root.theme-light-warm .set-card-preview-box,
+    :root.theme-nordic-cool .set-card-preview-box,
+    :root.theme-sakura-peach .set-card-preview-box,
+    :root.theme-autumn-maple .set-card-preview-box,
+    :root.theme-macaron-pink .set-card-preview-box,
+    :root.theme-macaron-blue .set-card-preview-box,
+    :root.theme-macaron-green .set-card-preview-box,
+    :root.theme-macaron-yellow .set-card-preview-box,
+    :root.theme-macaron-purple .set-card-preview-box,
+    :root.theme-macaron-orange .set-card-preview-box {
+        background-color: #f8fafc !important;
+        background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 0) !important;
+        border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    :root.theme-light-warm .btn-ratio-switch,
+    :root.theme-nordic-cool .btn-ratio-switch,
+    :root.theme-sakura-peach .btn-ratio-switch,
+    :root.theme-autumn-maple .btn-ratio-switch,
+    :root.theme-macaron-pink .btn-ratio-switch,
+    :root.theme-macaron-blue .btn-ratio-switch,
+    :root.theme-macaron-green .btn-ratio-switch,
+    :root.theme-macaron-yellow .btn-ratio-switch,
+    :root.theme-macaron-purple .btn-ratio-switch,
+    :root.theme-macaron-orange .btn-ratio-switch {
+        background: rgba(0, 0, 0, 0.04) !important;
+        border-color: rgba(0, 0, 0, 0.1) !important;
+        color: var(--text-muted) !important;
+    }
+
+    :root.theme-light-warm .btn-ratio-switch.active,
+    :root.theme-nordic-cool .btn-ratio-switch.active,
+    :root.theme-sakura-peach .btn-ratio-switch.active,
+    :root.theme-autumn-maple .btn-ratio-switch.active,
+    :root.theme-macaron-pink .btn-ratio-switch.active,
+    :root.theme-macaron-blue .btn-ratio-switch.active,
+    :root.theme-macaron-green .btn-ratio-switch.active,
+    :root.theme-macaron-yellow .btn-ratio-switch.active,
+    :root.theme-macaron-purple .btn-ratio-switch.active,
+    :root.theme-macaron-orange .btn-ratio-switch.active {
+        background: #8b5cf6 !important;
+        color: #ffffff !important;
+        border-color: transparent !important;
+    }
+
+    :root.theme-light-warm .set-card-btn-bar .btn-icon,
+    :root.theme-nordic-cool .set-card-btn-bar .btn-icon,
+    :root.theme-sakura-peach .set-card-btn-bar .btn-icon,
+    :root.theme-autumn-maple .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-pink .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-blue .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-green .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-yellow .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-purple .set-card-btn-bar .btn-icon,
+    :root.theme-macaron-orange .set-card-btn-bar .btn-icon {
+        background: rgba(0, 0, 0, 0.04) !important;
+        border-color: rgba(0, 0, 0, 0.1) !important;
+        color: var(--text-main) !important;
+    }
+
+    :root.theme-light-warm .form-control-input,
+    :root.theme-nordic-cool .form-control-input,
+    :root.theme-sakura-peach .form-control-input,
+    :root.theme-autumn-maple .form-control-input,
+    :root.theme-macaron-pink .form-control-input,
+    :root.theme-macaron-blue .form-control-input,
+    :root.theme-macaron-green .form-control-input,
+    :root.theme-macaron-yellow .form-control-input,
+    :root.theme-macaron-purple .form-control-input,
+    :root.theme-macaron-orange .form-control-input {
+        background: rgba(0, 0, 0, 0.03) !important;
+        border-color: rgba(0, 0, 0, 0.12) !important;
+        color: var(--text-main) !important;
+    }
+
+    :root.theme-light-warm .btn-secondary,
+    :root.theme-nordic-cool .btn-secondary,
+    :root.theme-sakura-peach .btn-secondary,
+    :root.theme-autumn-maple .btn-secondary,
+    :root.theme-macaron-pink .btn-secondary,
+    :root.theme-macaron-blue .btn-secondary,
+    :root.theme-macaron-green .btn-secondary,
+    :root.theme-macaron-yellow .btn-secondary,
+    :root.theme-macaron-purple .btn-secondary,
+    :root.theme-macaron-orange .btn-secondary {
+        background: rgba(0, 0, 0, 0.05) !important;
+        border-color: rgba(0, 0, 0, 0.15) !important;
+        color: var(--text-main) !important;
     }
 </style>
 {% endblock %}
@@ -887,19 +1006,18 @@
 </div>
 
 <!-- 2. 系列详情弹窗 Modal (平铺显示商品套卡片) -->
-<div class="admin-modal" id="folderDetailModal">
-    <div class="modal-content" style="max-width: 1100px; width: 95%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; padding: 20px 25px;">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-shrink: 0; margin-bottom: 12px; padding-bottom: 10px;">
+<div class="modal admin-modal" id="folderDetailModal">
+    <div class="modal-content" style="max-width: 1180px; width: 95%; max-height: 90vh; height: 86vh; display: flex; flex-direction: column; overflow: hidden; padding: 18px 24px; box-sizing: border-box;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-shrink: 0; margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--card-border);">
             <span id="detailModalTitle" style="font-weight: 800; font-size: 1.15rem; color: var(--text-main);">🖼️ 画布详情</span>
-            <button class="btn-primary" style="margin: 0; font-size: 0.78rem; padding: 6px 12px; height: 32px;" onclick="openSetModal()">+ 新增画布</button>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn-primary" style="margin: 0; font-size: 0.8rem; padding: 6px 14px; height: 32px; border-radius: 8px; font-weight: 700;" onclick="openSetModal()">+ 新增画布</button>
+                <span class="modal-close-icon" onclick="closeFolderDetailModal()" title="关闭" style="cursor: pointer; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #ef4444; font-size: 1.1rem; font-weight: 800; transition: all 0.2s ease;">✕</span>
+            </div>
         </div>
         
-        <!-- 商品套卡片平铺网格 -->
-        <div class="sets-list-grid" id="setsDetailGrid" style="flex: 1; overflow-y: auto; min-height: 0; margin-top: 10px;"></div>
-        
-        <div style="display: flex; justify-content: flex-end; margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--card-border); flex-shrink: 0;">
-            <button class="btn-secondary" style="padding: 8px 20px;" onclick="closeFolderDetailModal()">关闭</button>
-        </div>
+        <!-- 商品套卡片平铺网格 (5列排布) -->
+        <div class="sets-list-grid" id="setsDetailGrid" style="flex: 1; overflow-y: auto; min-height: 0; margin-top: 4px;"></div>
     </div>
 </div>
 
@@ -1075,8 +1193,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/admin_canvases_api.js?v=202608150843"></script>
-<script src="/static/js/admin_canvases_lightbox.js?v=202608150843"></script>
-<script src="/static/js/admin_canvases_drag.js?v=202608150843"></script>
-<script src="/static/js/admin_canvases.js?v=202608150843"></script>
+<script src="/static/js/admin_canvases_api.js?v=202608151020"></script>
+<script src="/static/js/admin_canvases_lightbox.js?v=202608151020"></script>
+<script src="/static/js/admin_canvases_drag.js?v=202608151020"></script>
+<script src="/static/js/admin_canvases.js?v=202608151020"></script>
 {% endblock %}

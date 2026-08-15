@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import settings
 from .database import Base, engine, SessionLocal, migrate_and_cleanup_legacy_settings
-from .services.mdns_discovery import broadcaster, get_mdns_settings_and_start, start_udp_discovery_responder
+from .services.mdns_discovery import broadcaster, get_mdns_settings_and_start
 
 # Configure Logging
 logging.basicConfig(
@@ -56,8 +56,6 @@ def seed_initial_dino_configs(db):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start UDP Discovery Responder
-    start_udp_discovery_responder()
     # Migrate legacy system_settings table if present
     try:
         migrate_and_cleanup_legacy_settings()
@@ -544,8 +542,12 @@ async def lifespan(app: FastAPI):
         logger.error(f"Database: Failed to check/create tables or seed default admin: {e}")
 
 
-    # Start mDNS Broadcaster
-    get_mdns_settings_and_start()
+    # Start mDNS Broadcaster in background thread to avoid blocking main event loop
+    try:
+        import asyncio
+        await asyncio.to_thread(get_mdns_settings_and_start)
+    except Exception as mdns_err:
+        logger.error(f"Lifespan: Error starting mDNS broadcaster: {mdns_err}")
 
     # Start background task to compress historical uploads (lossless optimization)
     try:
@@ -558,7 +560,12 @@ async def lifespan(app: FastAPI):
     
     # Shutdown: Stop mDNS Broadcaster
     logger.info("Lifespan: Stopping mDNS broadcaster...")
-    broadcaster.stop()
+    try:
+        import asyncio
+        await asyncio.to_thread(broadcaster.stop)
+    except Exception as mdns_stop_err:
+        logger.error(f"Lifespan: Error stopping mDNS broadcaster: {mdns_stop_err}")
+
 
 app = FastAPI(
     title=settings.app_name,

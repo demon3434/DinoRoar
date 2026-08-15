@@ -9,11 +9,11 @@ services:
     container_name: dinoroar-app
     restart: unless-stopped
     ports:
-      # Exposes the configured host port mapping (defaults to 8080)
+      # Exposes the single HTTP port for Web & API (defaults to 8080)
       - "${WEB_PORT:-8080}:8080"
-      - "8090:8090/udp"
     environment:
       - WEB_PORT=${WEB_PORT:-8080}
+      - SERVICE_ADVERTISE_HOST=${SERVICE_ADVERTISE_HOST:-}
       - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
       - STT_API_URL=http://stt:18000/api/transcribe
       - UPLOAD_DIR=/workspace/uploads
@@ -29,6 +29,7 @@ services:
         max-file: "${DOCKER_LOG_MAX_FILE:-3}"
     networks:
       - dinoroar_net
+      - dinoroar_mdns
 
   stt:
     build:
@@ -39,8 +40,6 @@ services:
     restart: unless-stopped
     # ports:
     #   - "18000:18000"
-
-
 
     volumes:
       # Caches ONNX models to avoid redownloading on container recreation
@@ -57,3 +56,9 @@ networks:
   dinoroar_net:
     name: dinoroar_net
     driver: bridge
+  dinoroar_mdns:
+    name: dinoroar_mdns
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-dinoroar
+
