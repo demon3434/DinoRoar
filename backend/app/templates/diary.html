@@ -5,6 +5,7 @@
 {% block content %}
 <!-- Logs filters container -->
 <div class="card" style="margin-bottom: 30px; padding: 20px;">
+    <!-- 标题栏（可点击折叠） -->
     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleFiltersPanel()">
         <h3 style="font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:8px;">
             <span>🔍 心情时光穿梭机</span>
@@ -12,20 +13,36 @@
         </h3>
         <span id="toggleFiltersIcon" style="transition: transform 0.3s; font-size:0.9rem;">▼</span>
     </div>
-    
+
     <div id="collapsibleFiltersContent" style="max-height: 500px; overflow: hidden; opacity: 1; transition: max-height 0.3s ease, opacity 0.3s ease; margin-top: 15px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
-            <div style="display: flex; flex-direction: column; gap: 6px;">
+
+        <!-- 第一行：关键字搜索（拉宽）+ 重置按钮 -->
+        <div style="display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
                 <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">关键字检索:</label>
-                <input type="text" id="keywordFilter" placeholder="搜索关键字..." style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
+                <input type="text" id="keywordFilter" placeholder="搜索标题或正文关键字..."
+                    style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none;">
             </div>
+            <button onclick="clearFilters()"
+                style="flex-shrink: 0; height: 36px; background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); font-size: 0.8rem; padding: 0 16px; border-radius: 8px; cursor: pointer; white-space: nowrap;">
+                重置筛选
+            </button>
+        </div>
+
+        <!-- 第二行：关系人物 / 恐龙心情 / 日期区间（三等分，永不换行） -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end;">
+            <!-- 关系人物 -->
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">关系人物:</label>
-                <select id="personFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;"></select>
+                <select id="personFilter"
+                    style="width: 100%; padding: 8px 10px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;"></select>
             </div>
+
+            <!-- 恐龙心情 -->
             <div style="display: flex; flex-direction: column; gap: 6px;">
                 <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">恐龙心情:</label>
-                <select id="moodFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+                <select id="moodFilter"
+                    style="width: 100%; padding: 8px 10px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
                     <option value="">全部心情</option>
                     <option value="Triceratops">😊 快乐三角龙 (开心)</option>
                     <option value="Pterodactyl_happy">🤩 冲天翼手龙 (兴奋)</option>
@@ -40,18 +57,20 @@
                     <option value="Dilophosaurus">😡 怒火双脊龙 (愤怒)</option>
                 </select>
             </div>
+
+            <!-- 日期区间（开始 ~ 结束，合并在一格） -->
             <div style="display: flex; flex-direction: column; gap: 6px;">
-                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">开始日期:</label>
-                <input type="date" id="startDateFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">结束日期:</label>
-                <input type="date" id="endDateFilter" style="padding: 8px 12px; font-size: 0.8rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">日期区间:</label>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="date" id="startDateFilter"
+                        style="flex: 1; min-width: 0; padding: 8px 6px; font-size: 0.78rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+                    <span style="color: var(--text-muted); font-size: 0.8rem; flex-shrink: 0;">～</span>
+                    <input type="date" id="endDateFilter"
+                        style="flex: 1; min-width: 0; padding: 8px 6px; font-size: 0.78rem; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(255,255,255,0.05); color: var(--text-main); outline: none; cursor: pointer;">
+                </div>
             </div>
         </div>
-        <div style="display:flex; justify-content:flex-end; margin-top:15px;">
-            <button onclick="clearFilters()" style="background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); font-size:0.8rem; padding: 6px 14px; border-radius:8px; cursor:pointer;">重置筛选</button>
-        </div>
+
     </div>
 </div>
 
