@@ -48,18 +48,26 @@ function openCustomConfirm(message, onConfirm) {
 }
 
 function setupModalDismissHandlers() {
-    // 点击空白遮罩处关闭
-    window.addEventListener('click', (e) => {
-        const promoModal = document.getElementById('promoModal');
-        const seriesPickerModal = document.getElementById('seriesPickerModal');
-        const customConfirmModal = document.getElementById('customConfirmModal');
-        if (e.target === customConfirmModal) {
-            customConfirmModal.style.display = 'none';
-        } else if (e.target === seriesPickerModal) {
-            closeSeriesPicker();
-        } else if (e.target === promoModal) {
-            closePromoModal();
-        }
+    // 修复「鼠标在层内按下、拖拽到层外松开」误触关闭 Bug：
+    // 用 mousedown 记录按下位置，只有当 mousedown 也发生在遮罩（非内容区）时，
+    // click 事件才触发关闭，防止文本框拖拽选词时误关弹窗。
+    const modalIds = ['promoModal', 'seriesPickerModal', 'customConfirmModal'];
+    modalIds.forEach(id => {
+        const modal = document.getElementById(id);
+        if (!modal) return;
+        let mouseDownOnBackdrop = false;
+        modal.addEventListener('mousedown', (e) => {
+            // 只有直接点击遮罩本身（非内容区子元素）才标记
+            mouseDownOnBackdrop = (e.target === modal);
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal && mouseDownOnBackdrop) {
+                if (id === 'customConfirmModal') modal.style.display = 'none';
+                else if (id === 'seriesPickerModal') closeSeriesPicker();
+                else if (id === 'promoModal') closePromoModal();
+            }
+            mouseDownOnBackdrop = false;
+        });
     });
 
     // 按 ESC 键关闭弹出层（优先关闭最顶层确认层，再关闭选择器，最后关闭主弹窗）
@@ -374,9 +382,14 @@ async function togglePromoActive(promoId, isActive) {
             body: JSON.stringify({ is_active: isActive })
         });
         if (!res.ok) throw new Error('切换状态失败');
+        if (typeof showToast === 'function') {
+            showToast(isActive ? '活动已启用' : '活动已停用', 'success');
+        }
         loadPromotions(currentPage);
     } catch (e) {
-        alert(e.message);
+        if (typeof showToast === 'function') {
+            showToast(e.message, 'error');
+        }
         loadPromotions(currentPage);
     }
 }
@@ -400,11 +413,7 @@ async function deletePromo(promoId) {
             }
             loadPromotions(currentPage);
         } catch (e) {
-            if (typeof showToast === 'function') {
-                showToast(e.message, 'error');
-            } else {
-                alert(e.message);
-            }
+            showToast(e.message, 'error');
         }
     });
 }
@@ -416,7 +425,7 @@ function toLocalDatetimeInputString(date) {
 
 function openCreatePromotionModal() {
     document.getElementById('promoId').value = '';
-    document.getElementById('promoModalTitle').textContent = '创建促销活动';
+    document.getElementById('promoModalTitle').textContent = '创建优惠活动';
     document.getElementById('promoName').value = '';
     document.getElementById('promoDesc').value = '';
 
@@ -436,7 +445,7 @@ function openEditPromotionModal(promoId) {
     if (!promo) return;
 
     document.getElementById('promoId').value = promo.id;
-    document.getElementById('promoModalTitle').textContent = `编辑促销活动 #${promo.id}`;
+    document.getElementById('promoModalTitle').textContent = '编辑优惠活动';
     document.getElementById('promoName').value = promo.name;
     document.getElementById('promoDesc').value = promo.description || '';
     document.getElementById('promoStartTime').value = toLocalDatetimeInputString(new Date(promo.start_time));
@@ -458,8 +467,33 @@ function closePromoModal() {
 }
 
 // ----------------------------------------------------
-// 规则配置卡片与交互（系列为最小颗粒度）
+// 规则配置卡片与交互（系列为最小颗粒度，单行流式布局）
 // ----------------------------------------------------
+
+function getSeriesCoverUrl(series, seriesType) {
+    if (!series) return '/static/images/ic_launcher.png';
+    if (seriesType === 'STICKER') {
+        const firstSticker = (series.stickers && series.stickers[0]) ? series.stickers[0] : null;
+        let img = firstSticker ? firstSticker.image_url : '';
+        if (img && !img.startsWith('/static/') && !img.startsWith('http')) {
+            img = '/static/images/dinosaurs/' + img;
+        }
+        return img || '/static/images/ic_launcher.png';
+    } else {
+        const firstSet = (series.sets && series.sets[0]) ? series.sets[0] : null;
+        let img = '';
+        if (firstSet) {
+            const firstInst = (firstSet.instances && firstSet.instances.length > 0)
+                ? (firstSet.instances.find(inst => inst.aspect_ratio === "16:9") || firstSet.instances[0])
+                : null;
+            img = firstInst ? firstInst.image_url : (firstSet.image_url || '');
+        }
+        if (img && !img.startsWith('/static/') && !img.startsWith('http')) {
+            img = '/static/images/canvases/' + img;
+        }
+        return img || '/static/images/default_canvases/default_canvas_16_9.png';
+    }
+}
 
 function addRuleRow(initData = {}) {
     const container = document.getElementById('rulesContainer');
@@ -468,68 +502,99 @@ function addRuleRow(initData = {}) {
     const fixed = initData.fixed_price != null ? initData.fixed_price : '';
     const targetType = initData.target_type || 'STICKER';
     const targetId = initData.target_id || null;
+    const pricingMode = (initData.fixed_price != null && initData.fixed_price !== '') ? 'FIXED' : 'DISCOUNT';
 
     const row = document.createElement('div');
     row.className = 'rule-item-box';
     row.setAttribute('data-target-id', targetId || '');
     row.setAttribute('data-target-type', targetType);
+    row.style.cssText = 'display: flex; align-items: center; gap: 8px; background: var(--bg-surface, rgba(0,0,0,0.02)); border: 1px solid var(--card-border, rgba(0,0,0,0.1)); border-radius: 10px; padding: 6px 10px; margin-bottom: 8px; flex-wrap: nowrap;';
 
     row.innerHTML = `
-        <button type="button" class="rule-remove-btn" onclick="this.parentElement.remove()" title="移除规则">✕</button>
-        <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; margin-bottom: 10px;">
-            <div>
-                <label class="form-label" style="display: block; margin-bottom: 4px;">作用范围</label>
-                <select class="form-control rule-scope" onchange="onRuleScopeChange(this)">
-                    <option value="ALL" ${scope === 'ALL' ? 'selected' : ''}>🌟 全场通用折扣</option>
-                    <option value="ITEM_TYPE" ${scope === 'ITEM_TYPE' ? 'selected' : ''}>📦 按商品大类</option>
-                    <option value="SERIES" ${scope === 'SERIES' ? 'selected' : ''}>📁 指定系列优惠</option>
-                </select>
+        <!-- 1. 作用范围 -->
+        <div style="width: 120px; flex-shrink: 0;">
+            <select class="form-control rule-scope" style="height: 34px; font-size: 0.82rem; padding: 4px 6px; border-radius: 6px;" onchange="onRuleScopeChange(this)">
+                <option value="ALL" ${scope === 'ALL' ? 'selected' : ''}>🌟 全场通用</option>
+                <option value="ITEM_TYPE" ${scope === 'ITEM_TYPE' ? 'selected' : ''}>📦 按商品大类</option>
+                <option value="SERIES" ${scope === 'SERIES' ? 'selected' : ''}>📁 指定单品</option>
+            </select>
+        </div>
+
+        <!-- 2. 目标对象动态区域 (185px) -->
+        <div class="rule-target-section" style="width: 185px; flex-shrink: 0;">
+            <div class="scope-all-hint" style="display: ${scope === 'ALL' ? 'flex' : 'none'}; align-items: center; height: 34px; font-size: 0.82rem; color: #10b981; font-weight: 700; padding-left: 2px;">
+                ✓ 全场所有商品
             </div>
             
-            <div class="rule-target-section">
-                <!-- 动态渲染目标选择器 -->
-                <div class="scope-all-hint" style="display: ${scope === 'ALL' ? 'block' : 'none'}; padding-top: 24px; font-size: 0.85rem; color: #10b981; font-weight: 700;">
-                    ✓ 全场所有贴纸与画布均享此优惠
-                </div>
-                
-                <div class="scope-item-type-box" style="display: ${scope === 'ITEM_TYPE' ? 'block' : 'none'};">
-                    <label class="form-label" style="display: block; margin-bottom: 4px;">选择大类</label>
-                    <select class="form-control rule-item-type" style="width: 100%;">
-                        <option value="STICKER" ${targetType === 'STICKER' ? 'selected' : ''}>🎨 所有手账贴纸</option>
-                        <option value="CANVAS_SET" ${targetType === 'CANVAS_SET' ? 'selected' : ''}>🖼️ 所有背景画布</option>
-                    </select>
-                </div>
+            <div class="scope-item-type-box" style="display: ${scope === 'ITEM_TYPE' ? 'block' : 'none'};">
+                <select class="form-control rule-item-type" style="width: 100%; height: 34px; font-size: 0.82rem; padding: 4px 6px; border-radius: 6px;">
+                    <option value="STICKER" ${targetType === 'STICKER' ? 'selected' : ''}>🎨 所有手账贴纸</option>
+                    <option value="CANVAS_SET" ${targetType === 'CANVAS_SET' ? 'selected' : ''}>🖼️ 所有背景画布</option>
+                </select>
+            </div>
 
-                <div class="scope-series-box" style="display: ${scope === 'SERIES' ? 'block' : 'none'};">
-                    <label class="form-label" style="display: block; margin-bottom: 4px;">指定优惠系列</label>
-                    <div class="target-series-container">
-                        <!-- JS 渲染已选系列微卡片或选择按钮 -->
-                    </div>
+            <div class="scope-series-box" style="display: ${scope === 'SERIES' ? 'block' : 'none'};">
+                <div class="target-series-container" style="width: 100%;">
+                    <!-- JS 渲染单行系列微缩胶囊或选择按钮 -->
                 </div>
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-                <label class="form-label" style="display: block; margin-bottom: 4px;">折扣率 (折，如 8 表示 8折)</label>
-                <input type="number" step="0.1" min="0.1" max="9.9" class="form-control rule-rate" value="${rate}" placeholder="例如 8.0">
+        <!-- 3. 优惠定价方式 -->
+        <div style="width: 125px; flex-shrink: 0;">
+            <select class="form-control rule-pricing-mode" style="height: 34px; font-size: 0.82rem; padding: 4px 6px; border-radius: 6px;" onchange="onRulePricingModeChange(this)">
+                <option value="DISCOUNT" ${pricingMode === 'DISCOUNT' ? 'selected' : ''}>🏷️ 折扣率打折</option>
+                <option value="FIXED" ${pricingMode === 'FIXED' ? 'selected' : ''}>🎯 一口价特惠</option>
+            </select>
+        </div>
+
+        <!-- 4. 数值输入框 (收窄为 110px) -->
+        <div style="width: 110px; flex-shrink: 0;">
+            <div class="pricing-discount-box" style="display: ${pricingMode === 'DISCOUNT' ? 'block' : 'none'};">
+                <input type="number" step="0.1" min="0.1" max="9.9" class="form-control rule-rate" value="${rate}" placeholder="折扣率(如8.5)" style="height: 34px; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px;">
             </div>
-            <div>
-                <label class="form-label" style="display: block; margin-bottom: 4px;">或 一口价特惠 (蛋能量整数)</label>
-                <input type="number" min="1" class="form-control rule-fixed" value="${fixed}" placeholder="例如 3 (系列全员统一特价)">
+            <div class="pricing-fixed-box" style="display: ${pricingMode === 'FIXED' ? 'block' : 'none'};">
+                <input type="number" min="1" class="form-control rule-fixed" value="${fixed}" placeholder="一口价(蛋能量)" style="height: 34px; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px;">
             </div>
         </div>
+
+        <!-- 5. 移除规则按钮 -->
+        <button type="button" onclick="confirmRemoveRule(this)" title="移除此条规则" style="background: none; border: none; color: #ef4444; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; line-height: 1; flex-shrink: 0; border-radius: 4px; margin-left: auto;">✕</button>
     `;
 
     container.appendChild(row);
     renderRuleTargetSeriesCard(row, targetType, targetId);
 }
 
+function confirmRemoveRule(btn) {
+    const row = btn.closest('.rule-item-box');
+    // 简要识别规则摘要
+    const scopeEl = row.querySelector('.rule-scope');
+    const scopeText = scopeEl ? scopeEl.options[scopeEl.selectedIndex].text : '此条规则';
+    openCustomConfirm(`确定要删除优惠规则「${scopeText}」吗？`, () => {
+        row.remove();
+    });
+}
+
+function onRulePricingModeChange(selectEl) {
+    const row = selectEl.closest('.rule-item-box');
+    const mode = selectEl.value;
+    const discountBox = row.querySelector('.pricing-discount-box');
+    const fixedBox = row.querySelector('.pricing-fixed-box');
+    if (mode === 'DISCOUNT') {
+        discountBox.style.display = 'block';
+        fixedBox.style.display = 'none';
+    } else {
+        discountBox.style.display = 'none';
+        fixedBox.style.display = 'block';
+    }
+}
+
 function onRuleScopeChange(selectEl) {
     const row = selectEl.closest('.rule-item-box');
     const scope = selectEl.value;
     
-    row.querySelector('.scope-all-hint').style.display = (scope === 'ALL') ? 'block' : 'none';
+    row.querySelector('.scope-all-hint').style.display = (scope === 'ALL') ? 'flex' : 'none';
     row.querySelector('.scope-item-type-box').style.display = (scope === 'ITEM_TYPE') ? 'block' : 'none';
     row.querySelector('.scope-series-box').style.display = (scope === 'SERIES') ? 'block' : 'none';
 
@@ -546,8 +611,8 @@ function renderRuleTargetSeriesCard(rowBox, seriesType, seriesId) {
 
     if (!seriesId) {
         container.innerHTML = `
-            <button type="button" class="btn-outline-purple" onclick="openSeriesPicker(this)" style="width: 100%; height: 38px; font-size: 0.85rem; justify-content: center;">
-                📁 点击选择系列...
+            <button type="button" class="btn-outline-purple" onclick="openSeriesPicker(this)" style="width: 100%; height: 34px; font-size: 0.8rem; justify-content: center; padding: 0 8px; border-radius: 6px;">
+                📁 选择单品...
             </button>
         `;
         return;
@@ -564,19 +629,15 @@ function renderRuleTargetSeriesCard(rowBox, seriesType, seriesId) {
         }
     }
     const name = ser ? ser.name : `系列 #${seriesId}`;
-    const typeLabel = (finalType === 'CANVAS_SET') ? '画布系列' : '贴纸系列';
-    const count = ser ? (ser.stickers ? ser.stickers.length : (ser.sets ? ser.sets.length : 0)) : 0;
+    const coverImg = getSeriesCoverUrl(ser, finalType);
 
     container.innerHTML = `
-        <div class="selected-target-card" style="display: flex; align-items: center; justify-content: space-between; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; padding: 6px 12px;">
-            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                <span style="font-size: 1.2rem;">📁</span>
-                <div>
-                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main);">${name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">${typeLabel} · 共 ${count} 款</div>
-                </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 6px; padding: 2px 6px; height: 34px; box-sizing: border-box; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; min-width: 0;">
+                <img src="${coverImg}" style="width: 24px; height: 24px; object-fit: cover; border-radius: 4px; background: rgba(255,255,255,0.7); flex-shrink: 0;" onerror="this.src='/static/images/ic_launcher.png'">
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${name}">${name}</span>
             </div>
-            <button type="button" class="btn-sm btn-sm-primary" onclick="openSeriesPicker(this)" style="padding: 2px 8px; font-size: 0.78rem;">更换系列</button>
+            <button type="button" class="btn-sm btn-sm-primary" onclick="openSeriesPicker(this)" style="padding: 2px 7px; font-size: 0.74rem; height: 24px; flex-shrink: 0; white-space: nowrap; line-height: 1; border-radius: 5px;">更换单品</button>
         </div>
     `;
 }
@@ -632,13 +693,17 @@ function renderSeriesPickerGrid() {
     filtered.forEach(s => {
         const isSelected = (currentPickerState.chosenSeriesId === s.id && currentPickerState.chosenSeriesType === currentPickerState.selectedType);
         const count = s.stickers ? s.stickers.length : (s.sets ? s.sets.length : 0);
-        const typeLabel = currentPickerState.selectedType === 'STICKER' ? '贴纸' : '画布';
+        const coverBoxClass = currentPickerState.selectedType === 'STICKER' ? 'sticker-cover' : 'canvas-cover';
+        const coverImg = getSeriesCoverUrl(s, currentPickerState.selectedType);
 
         html += `
-            <div class="picker-item-card ${isSelected ? 'selected' : ''}" onclick="selectSeriesItem(${s.id}, '${currentPickerState.selectedType}', '${s.name.replace(/'/g, "\\'")}')" style="padding: 14px 10px; cursor: pointer;">
-                <div style="font-size: 2rem; margin-bottom: 6px;">📁</div>
-                <div class="picker-item-name" title="${s.name}" style="font-weight: 800; font-size: 0.92rem; margin-bottom: 4px;">${s.name}</div>
-                <div style="font-size: 0.75rem; color: #8b5cf6; font-weight: 600;">共 ${count} 款${typeLabel}</div>
+            <div class="picker-item-card ${isSelected ? 'selected' : ''}" onclick="selectSeriesItem(${s.id}, '${currentPickerState.selectedType}', '${s.name.replace(/'/g, "\\'")}')" ondblclick="confirmSeriesSelection()">
+                <div class="picker-count-badge" title="共 ${count} 款">${count}</div>
+                <div class="picker-check-badge">✓</div>
+                <div class="picker-cover-box ${coverBoxClass}">
+                    <img src="${coverImg}" class="picker-cover-img" onerror="this.src='/static/images/ic_launcher.png'" alt="${s.name}">
+                </div>
+                <div class="picker-item-name" title="${s.name}">${s.name}</div>
             </div>
         `;
     });
@@ -656,6 +721,7 @@ function selectSeriesItem(seriesId, seriesType, seriesName) {
 
 function updateSeriesPickerSelectedHint() {
     const hintEl = document.getElementById('pickerSelectedHint');
+    if (!hintEl) return;
     if (!currentPickerState.chosenSeriesId) {
         hintEl.innerHTML = `<span style="color: var(--text-muted);">尚未选择系列</span>`;
         return;
@@ -666,7 +732,10 @@ function updateSeriesPickerSelectedHint() {
 
 function confirmSeriesSelection() {
     if (!currentPickerState.chosenSeriesId) {
-        return alert('请先在列表中点击选择一个系列');
+        if (typeof showToast === 'function') {
+            showToast('请先在列表中点击选择一个系列', 'warning');
+        }
+        return;
     }
     if (currentPickerState.activeRowBox) {
         currentPickerState.activeRowBox.setAttribute('data-target-id', currentPickerState.chosenSeriesId);
@@ -687,22 +756,32 @@ async function submitPromoForm() {
     const startTime = document.getElementById('promoStartTime').value;
     const endTime = document.getElementById('promoEndTime').value;
 
-    if (!name) return alert('请输入活动名称');
-    if (!startTime || !endTime) return alert('请选择完整的活动起止时间');
+    if (!name) {
+        return showToast('请输入活动名称', 'warning');
+    }
+    if (!startTime || !endTime) {
+        return showToast('请选择完整的活动起止时间', 'warning');
+    }
 
     const ruleBoxes = document.querySelectorAll('.rule-item-box');
     const targets = [];
 
     for (const box of ruleBoxes) {
         const scope = box.querySelector('.rule-scope').value;
-        const rateVal = parseFloat(box.querySelector('.rule-rate').value);
-        const fixedVal = parseInt(box.querySelector('.rule-fixed').value, 10);
-
+        const pricingMode = box.querySelector('.rule-pricing-mode') ? box.querySelector('.rule-pricing-mode').value : 'DISCOUNT';
         const targetData = { target_scope: scope };
 
-        if (!isNaN(fixedVal) && fixedVal > 0) {
+        if (pricingMode === 'FIXED') {
+            const fixedVal = parseInt(box.querySelector('.rule-fixed').value, 10);
+            if (isNaN(fixedVal) || fixedVal <= 0) {
+                return showToast('请填写有效的一口价金额 (大于0的整数)', 'warning');
+            }
             targetData.fixed_price = fixedVal;
-        } else if (!isNaN(rateVal) && rateVal > 0) {
+        } else {
+            const rateVal = parseFloat(box.querySelector('.rule-rate').value);
+            if (isNaN(rateVal) || rateVal <= 0 || rateVal >= 10) {
+                return showToast('请填写有效的折扣率 (0.1 ~ 9.9 之间，例如 8.0 表示 8折)', 'warning');
+            }
             targetData.discount_rate = parseFloat((rateVal / 10).toFixed(2));
         }
 
@@ -712,7 +791,7 @@ async function submitPromoForm() {
             const targetId = parseInt(box.getAttribute('data-target-id'), 10);
             const targetType = box.getAttribute('data-target-type') || 'STICKER';
             if (!targetId || isNaN(targetId)) {
-                return alert('请为“指定系列优惠”规则选择具体的系列目标！');
+                return showToast('请为“指定系列优惠”规则选择具体的系列目标！', 'warning');
             }
             targetData.target_type = targetType;
             targetData.target_id = targetId;
@@ -722,7 +801,7 @@ async function submitPromoForm() {
     }
 
     if (targets.length === 0) {
-        return alert('请至少配置一条优惠规则');
+        return showToast('请至少配置一条优惠规则', 'warning');
     }
 
     const payload = {
@@ -749,13 +828,18 @@ async function submitPromoForm() {
         });
 
         if (!res.ok) {
-            const err = await res.json();
+            const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || '保存活动失败');
         }
 
+        if (typeof showToast === 'function') {
+            showToast(promoId ? '促销活动修改成功' : '促销活动创建成功', 'success');
+        }
         closePromoModal();
-        loadPromotions();
+        loadPromotions(currentPage);
     } catch (e) {
-        alert(e.message);
+        if (typeof showToast === 'function') {
+            showToast(e.message, 'error');
+        }
     }
 }

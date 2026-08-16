@@ -389,12 +389,22 @@ function showToast(msg) {
     }, 2000);
 }
 
-// Close Modal when click outside
-window.addEventListener('click', function(e) {
-    const catModal = document.getElementById('categoryModal');
-    const pModal = document.getElementById('personModal');
-    if (e.target === catModal) closeCategoryModal();
-    if (e.target === pModal) closePersonModal();
+// 修复「鼠标在层内按下、拖拽到层外松开」误触关闭 Bug
+// mousedown 发生在遮罩本身时才允许 click 关闭，防止文本框拖拽选词时误关弹窗
+['categoryModal', 'personModal'].forEach(id => {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    let mouseDownOnBackdrop = false;
+    modal.addEventListener('mousedown', (e) => {
+        mouseDownOnBackdrop = (e.target === modal);
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal && mouseDownOnBackdrop) {
+            if (id === 'categoryModal') closeCategoryModal();
+            else if (id === 'personModal') closePersonModal();
+        }
+        mouseDownOnBackdrop = false;
+    });
 });
 
 // Start Initialization
