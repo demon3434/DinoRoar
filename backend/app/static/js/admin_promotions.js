@@ -24,10 +24,60 @@ let currentPickerState = {
     chosenSeriesName: ''
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadPromotions(1);
-    loadMetadata();
+document.addEventListener('DOMContentLoaded', async () => {
+    // 注册全局空白处点击与 ESC 按键关闭弹窗事件监听
+    setupModalDismissHandlers();
+    // 优先加载元数据字典（贴纸/画布系列与商品），再渲染活动列表以确保系列名称与单品名称精准显示
+    await loadMetadata();
+    await loadPromotions(1);
 });
+
+function openCustomConfirm(message, onConfirm) {
+    document.getElementById('confirmMessage').textContent = message;
+    const modal = document.getElementById('customConfirmModal');
+    modal.style.display = 'flex';
+    const okBtn = document.getElementById('btnConfirmOK');
+    const cancelBtn = document.getElementById('btnConfirmCancel');
+    okBtn.onclick = () => {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+    };
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+}
+
+function setupModalDismissHandlers() {
+    // 点击空白遮罩处关闭
+    window.addEventListener('click', (e) => {
+        const promoModal = document.getElementById('promoModal');
+        const seriesPickerModal = document.getElementById('seriesPickerModal');
+        const customConfirmModal = document.getElementById('customConfirmModal');
+        if (e.target === customConfirmModal) {
+            customConfirmModal.style.display = 'none';
+        } else if (e.target === seriesPickerModal) {
+            closeSeriesPicker();
+        } else if (e.target === promoModal) {
+            closePromoModal();
+        }
+    });
+
+    // 按 ESC 键关闭弹出层（优先关闭最顶层确认层，再关闭选择器，最后关闭主弹窗）
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            const customConfirmModal = document.getElementById('customConfirmModal');
+            const seriesPickerModal = document.getElementById('seriesPickerModal');
+            const promoModal = document.getElementById('promoModal');
+            if (customConfirmModal && customConfirmModal.style.display !== 'none' && customConfirmModal.style.display !== '') {
+                customConfirmModal.style.display = 'none';
+            } else if (seriesPickerModal && seriesPickerModal.style.display !== 'none' && seriesPickerModal.style.display !== '') {
+                closeSeriesPicker();
+            } else if (promoModal && promoModal.style.display !== 'none' && promoModal.style.display !== '') {
+                closePromoModal();
+            }
+        }
+    });
+}
 
 async function loadMetadata() {
     try {
@@ -44,17 +94,39 @@ async function loadMetadata() {
         availableStickerSeries = stSeriesRes || [];
         availableCanvasSeries = cvSeriesRes || [];
         availableShopItems = itemsRes || [];
+
+        // 若促销活动列表已就绪，立即重新渲染以刷新系列名称
+        if (allPromotions && allPromotions.length > 0) {
+            renderPromotionsList();
+        }
     } catch (e) {
         console.error('加载促销元数据失败', e);
     }
 }
+
+// 筛选条件状态
+let filterState = {
+    keyword: '',
+    status: '',
+    startDate: '',
+    endDate: ''
+};
 
 async function loadPromotions(page = 1) {
     currentPage = page;
     const container = document.getElementById('promotionsListContainer');
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`/api/admin/promotions?page=${currentPage}&page_size=${pageSize}`, {
+        const params = new URLSearchParams({
+            page: currentPage,
+            page_size: pageSize
+        });
+        if (filterState.keyword) params.append('keyword', filterState.keyword);
+        if (filterState.status) params.append('status', filterState.status);
+        if (filterState.startDate) params.append('start_date', filterState.startDate);
+        if (filterState.endDate) params.append('end_date', filterState.endDate);
+
+        const res = await fetch(`/api/admin/promotions?${params.toString()}`, {
             headers: { 'Authorization': 'Bearer ' + token }
         });
         if (!res.ok) throw new Error('获取活动列表失败');
@@ -66,6 +138,41 @@ async function loadPromotions(page = 1) {
     } catch (err) {
         container.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">加载失败: ${err.message}</div>`;
     }
+}
+
+function applyFilters() {
+    const kwInput = document.getElementById('filterKeyword');
+    const stSelect = document.getElementById('filterStatus');
+    const sdInput = document.getElementById('filterStartDate');
+    const edInput = document.getElementById('filterEndDate');
+
+    filterState.keyword = kwInput ? kwInput.value.trim() : '';
+    filterState.status = stSelect ? stSelect.value : '';
+    filterState.startDate = sdInput ? sdInput.value : '';
+    filterState.endDate = edInput ? edInput.value : '';
+
+    loadPromotions(1);
+}
+
+function resetFilters() {
+    const kwInput = document.getElementById('filterKeyword');
+    const stSelect = document.getElementById('filterStatus');
+    const sdInput = document.getElementById('filterStartDate');
+    const edInput = document.getElementById('filterEndDate');
+
+    if (kwInput) kwInput.value = '';
+    if (stSelect) stSelect.value = '';
+    if (sdInput) sdInput.value = '';
+    if (edInput) edInput.value = '';
+
+    filterState = {
+        keyword: '',
+        status: '',
+        startDate: '',
+        endDate: ''
+    };
+
+    loadPromotions(1);
 }
 
 function changePromoPage(targetPage) {
@@ -110,11 +217,35 @@ function formatRuleSummary(targets) {
         if (t.target_scope === 'ITEM_TYPE') {
             scopeTxt = t.target_type === 'STICKER' ? '🎨 所有手账贴纸' : '🖼️ 所有背景画布';
         } else if (t.target_scope === 'SERIES') {
-            const seriesList = t.target_type === 'STICKER' ? availableStickerSeries : availableCanvasSeries;
-            const ser = seriesList.find(s => s.id === t.target_id);
+            let seriesList = t.target_type === 'STICKER' ? availableStickerSeries : availableCanvasSeries;
+            let ser = seriesList.find(s => String(s.id) === String(t.target_id));
+            let finalType = t.target_type;
+            if (!ser) {
+                const altList = t.target_type === 'STICKER' ? availableCanvasSeries : availableStickerSeries;
+                ser = altList.find(s => String(s.id) === String(t.target_id));
+                if (ser) {
+                    finalType = t.target_type === 'STICKER' ? 'CANVAS_SET' : 'STICKER';
+                }
+            }
             const name = ser ? ser.name : `系列 #${t.target_id}`;
-            const typeLabel = t.target_type === 'STICKER' ? '贴纸系列' : '画布系列';
+            const typeLabel = finalType === 'STICKER' ? '贴纸系列' : '画布系列';
             scopeTxt = `📁 [${typeLabel}] ${name}`;
+        } else if (t.target_scope === 'SHOP_ITEM') {
+            const item = availableShopItems.find(i => String(i.shop_item_id) === String(t.target_id));
+            let itemName = item && item.asset ? item.asset.name : null;
+            if (!itemName) {
+                for (const ser of availableStickerSeries) {
+                    const st = (ser.stickers || []).find(s => String(s.id) === String(t.target_id));
+                    if (st) { itemName = `${st.name}（${ser.name}）`; break; }
+                }
+                if (!itemName) {
+                    for (const ser of availableCanvasSeries) {
+                        const cs = (ser.sets || []).find(s => String(s.id) === String(t.target_id));
+                        if (cs) { itemName = `${cs.name}（${ser.name}）`; break; }
+                    }
+                }
+            }
+            scopeTxt = `🛍️ [单品] ${itemName || `商品 #${t.target_id}`}`;
         }
 
         let discTxt = '';
@@ -129,15 +260,28 @@ function formatRuleSummary(targets) {
 
 function renderPromotionsList() {
     const container = document.getElementById('promotionsListContainer');
+    const isFiltered = !!(filterState.keyword || filterState.status || filterState.startDate || filterState.endDate);
+
     if (!allPromotions || allPromotions.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; background: var(--card-bg, rgba(255,255,255,0.8)); border-radius: 16px; border: 1px dashed var(--card-border, rgba(0,0,0,0.15));">
-                <div style="font-size: 2.5rem; margin-bottom: 12px;">🏷️</div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">暂无促销活动</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">点击右上角按钮即可一键配置节日打折或全场大促</div>
-                <button class="btn btn-primary-purple" onclick="openCreatePromotionModal()">创建第一个活动</button>
-            </div>
-        `;
+        if (isFiltered) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; background: var(--card-bg, rgba(255,255,255,0.8)); border-radius: 16px; border: 1px dashed var(--card-border, rgba(0,0,0,0.15));">
+                    <div style="font-size: 2.5rem; margin-bottom: 12px;">🔍</div>
+                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">未找到符合条件的优惠活动</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">请尝试更换关键字、放宽日期范围或调整活动状态</div>
+                    <button class="btn btn-primary-purple" onclick="resetFilters()">↺ 重置筛选条件</button>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; background: var(--card-bg, rgba(255,255,255,0.8)); border-radius: 16px; border: 1px dashed var(--card-border, rgba(0,0,0,0.15));">
+                    <div style="font-size: 2.5rem; margin-bottom: 12px;">🏷️</div>
+                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">暂无促销活动</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">点击右上角按钮即可一键配置节日打折或全场大促</div>
+                    <button class="btn btn-primary-purple" onclick="openCreatePromotionModal()">创建第一个活动</button>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -146,12 +290,10 @@ function renderPromotionsList() {
             <table class="promo-table">
                 <thead>
                     <tr>
-                        <th style="text-align: left; min-width: 140px;">活动名称与文案</th>
-                        <th style="text-align: left; min-width: 160px;">活动起止时间</th>
+                        <th style="text-align: left; width: 240px; min-width: 180px;">活动名称与文案</th>
+                        <th style="text-align: left; width: 185px; min-width: 180px; white-space: nowrap;">活动状态及时间</th>
                         <th style="text-align: left;">优惠规则摘要</th>
-                        <th style="width: 110px; text-align: left;">实时状态</th>
-                        <th style="width: 90px; text-align: left;">启用开关</th>
-                        <th style="width: 130px; text-align: left;">操作</th>
+                        <th style="width: 75px; min-width: 75px; text-align: center; white-space: nowrap;">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -165,27 +307,27 @@ function renderPromotionsList() {
                     <div style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">${p.name}</div>
                     ${p.description ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">💬 ${p.description}</div>` : ''}
                 </td>
-                <td style="text-align: left; font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
-                    <div>起: ${formatDateTime(p.start_time)}</div>
-                    <div>止: ${formatDateTime(p.end_time)}</div>
+                <td style="text-align: left; line-height: 1.5; white-space: nowrap;">
+                    <div style="margin-bottom: 6px;">
+                        <span class="promo-badge ${st.class}">
+                            ${st.icon} ${st.label}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);">起: ${formatDateTime(p.start_time)}</div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted);">止: ${formatDateTime(p.end_time)}</div>
                 </td>
                 <td style="text-align: left; font-size: 0.85rem; color: #7c3aed; font-weight: 600;">
                     ${formatRuleSummary(p.targets)}
                 </td>
-                <td style="text-align: left;">
-                    <span class="promo-badge ${st.class}">
-                        ${st.icon} ${st.label}
-                    </span>
-                </td>
-                <td style="text-align: left;">
-                    <label class="switch">
-                        <input type="checkbox" ${p.is_active ? 'checked' : ''} onchange="togglePromoActive(${p.id}, this.checked)">
-                        <span class="slider"></span>
-                    </label>
-                </td>
-                <td style="text-align: left; white-space: nowrap;">
-                    <button class="btn-sm btn-sm-primary" onclick="openEditPromotionModal(${p.id})" style="margin-right: 6px;">编辑</button>
-                    <button class="btn-sm btn-danger" onclick="deletePromo(${p.id})">删除</button>
+                <td style="text-align: center; width: 75px; padding: 8px 6px;">
+                    <div style="display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center;">
+                        <button class="btn-sm btn-sm-primary" onclick="openEditPromotionModal(${p.id})" style="padding: 2px 0; font-size: 0.76rem; width: 54px; text-align: center; border-radius: 6px;">编辑</button>
+                        <div class="capsule-switch ${p.is_active ? 'active' : 'disabled'}" onclick="togglePromoActive(${p.id}, ${!p.is_active})" title="${p.is_active ? '点击停用活动' : '点击启用活动'}">
+                            <span class="capsule-switch-dot"></span>
+                            <span class="capsule-switch-text">${p.is_active ? '启用' : '停用'}</span>
+                        </div>
+                        <button class="btn-sm btn-danger" onclick="deletePromo(${p.id})" style="padding: 2px 0; font-size: 0.76rem; width: 54px; text-align: center; border-radius: 6px;">删除</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -240,18 +382,31 @@ async function togglePromoActive(promoId, isActive) {
 }
 
 async function deletePromo(promoId) {
-    if (!confirm('确定要删除该促销活动吗？删除后不可恢复。')) return;
-    try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/admin/promotions/${promoId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (!res.ok) throw new Error('删除失败');
-        loadPromotions(currentPage);
-    } catch (e) {
-        alert(e.message);
-    }
+    const promo = allPromotions.find(p => p.id === promoId);
+    const promoName = promo ? `“${promo.name}”` : '';
+    openCustomConfirm(`确定要删除优惠活动 ${promoName} 吗？删除后不可恢复。`, async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/admin/promotions/${promoId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || '删除失败');
+            }
+            if (typeof showToast === 'function') {
+                showToast('优惠活动已删除', 'success');
+            }
+            loadPromotions(currentPage);
+        } catch (e) {
+            if (typeof showToast === 'function') {
+                showToast(e.message, 'error');
+            } else {
+                alert(e.message);
+            }
+        }
+    });
 }
 
 function toLocalDatetimeInputString(date) {
@@ -398,10 +553,18 @@ function renderRuleTargetSeriesCard(rowBox, seriesType, seriesId) {
         return;
     }
 
-    const seriesList = (seriesType === 'CANVAS_SET') ? availableCanvasSeries : availableStickerSeries;
-    const ser = seriesList.find(s => s.id === seriesId);
+    let seriesList = (seriesType === 'CANVAS_SET') ? availableCanvasSeries : availableStickerSeries;
+    let ser = seriesList.find(s => String(s.id) === String(seriesId));
+    let finalType = seriesType;
+    if (!ser) {
+        const altList = (seriesType === 'CANVAS_SET') ? availableStickerSeries : availableCanvasSeries;
+        ser = altList.find(s => String(s.id) === String(seriesId));
+        if (ser) {
+            finalType = (seriesType === 'CANVAS_SET') ? 'STICKER' : 'CANVAS_SET';
+        }
+    }
     const name = ser ? ser.name : `系列 #${seriesId}`;
-    const typeLabel = (seriesType === 'CANVAS_SET') ? '画布系列' : '贴纸系列';
+    const typeLabel = (finalType === 'CANVAS_SET') ? '画布系列' : '贴纸系列';
     const count = ser ? (ser.stickers ? ser.stickers.length : (ser.sets ? ser.sets.length : 0)) : 0;
 
     container.innerHTML = `

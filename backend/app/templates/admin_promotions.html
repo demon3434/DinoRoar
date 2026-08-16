@@ -1,6 +1,6 @@
 {% extends "admin_base.html" %}
 
-{% block title %}促销活动管理 - 恐龙风暴 DinoRoar{% endblock %}
+{% block title %}优惠活动管理 - 恐龙风暴 DinoRoar{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="/static/css/admin_stickers.css?v=20260815">
@@ -169,48 +169,65 @@
     color: var(--text-muted, #64748b);
 }
 
-/* Switch 开关 */
-.switch {
+/* 现代文字滑动胶囊开关 (Capsule Switch) */
+.capsule-switch {
     position: relative;
-    display: inline-block;
-    width: 42px;
+    display: inline-flex;
+    align-items: center;
+    width: 54px;
     height: 22px;
-}
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
+    border-radius: 11px;
     cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.18);
-    transition: .3s;
-    border-radius: 22px;
+    user-select: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
 }
 
-.slider:before {
+.capsule-switch.active {
+    background: #10b981;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.35);
+}
+
+.capsule-switch.disabled {
+    background: #94a3b8;
+    box-shadow: 0 1px 4px rgba(148, 163, 184, 0.2);
+}
+
+.capsule-switch-dot {
     position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    transition: .3s;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
     border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-input:checked + .slider {
-    background-color: #10b981;
+.capsule-switch.active .capsule-switch-dot {
+    transform: translateX(32px);
 }
 
-input:checked + .slider:before {
-    transform: translateX(20px);
+.capsule-switch.disabled .capsule-switch-dot {
+    transform: translateX(0);
+}
+
+.capsule-switch-text {
+    width: 100%;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    text-align: right;
+    padding-right: 5px;
+    letter-spacing: 0.5px;
+}
+
+.capsule-switch.active .capsule-switch-text {
+    text-align: left;
+    padding-left: 6px;
+    padding-right: 0;
 }
 
 /* 商品选择抽屉网格 */
@@ -306,6 +323,65 @@ input:checked + .slider:before {
     color: white;
     border-color: #8b5cf6;
 }
+
+/* 顶部筛选工具栏专属样式 (纯单行横向流式布局，永不折行) */
+.promo-filter-card {
+    background: var(--card-bg, rgba(255, 255, 255, 0.8));
+    border: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
+    border-radius: 14px;
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.filter-label {
+    font-size: 0.82rem;
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.filter-date-group {
+    display: inline-flex;
+    align-items: center;
+    background: var(--input-bg, rgba(0, 0, 0, 0.03));
+    border: 1px solid var(--input-border, rgba(0, 0, 0, 0.12));
+    border-radius: 8px;
+    padding: 0 6px;
+    height: 32px;
+}
+
+.filter-date-group input[type="date"] {
+    border: none;
+    background: transparent;
+    font-size: 0.8rem;
+    color: var(--text-main);
+    padding: 0 2px;
+    outline: none;
+    height: 100%;
+}
+
+.filter-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
 </style>
 {% endblock %}
 
@@ -315,7 +391,7 @@ input:checked + .slider:before {
     <div class="promo-page-header">
         <div>
             <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-main); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
-                🎉 节日促销活动管理
+                🎉 优惠活动管理
             </h2>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
                 配置手账商城的限时特惠活动，支持全场通用折扣、分类/系列折扣及单品一口价
@@ -324,6 +400,46 @@ input:checked + .slider:before {
         <button class="btn btn-primary-purple" onclick="openCreatePromotionModal()" style="height: 38px; padding: 0 16px; font-weight: 700; white-space: nowrap;">
             <span>➕</span> 创建新促销活动
         </button>
+    </div>
+
+    <!-- 顶部筛选工具栏 (纯单行横向排开) -->
+    <div class="promo-filter-card">
+        <!-- 关键字搜索 -->
+        <div class="filter-item" style="min-width: 180px; max-width: 240px; flex: 1;">
+            <input type="text" id="filterKeyword" class="form-control" placeholder="🔍 搜索活动名称或文案..." style="height: 32px; font-size: 0.82rem; padding: 4px 10px;" onkeydown="if(event.key==='Enter') applyFilters()">
+        </div>
+
+        <!-- 状态筛选 -->
+        <div class="filter-item">
+            <span class="filter-label">状态:</span>
+            <select id="filterStatus" class="form-control" style="width: 105px; height: 32px; font-size: 0.82rem; padding: 4px 8px; border-radius: 8px;" onchange="applyFilters()">
+                <option value="">全部状态</option>
+                <option value="active">🟢 进行中</option>
+                <option value="upcoming">🟡 未开始</option>
+                <option value="ended">⚪ 已结束</option>
+                <option value="disabled">🔴 已停用</option>
+            </select>
+        </div>
+
+        <!-- 时间范围一体化组合条 -->
+        <div class="filter-item">
+            <span class="filter-label">日期:</span>
+            <div class="filter-date-group">
+                <input type="date" id="filterStartDate" onchange="applyFilters()" title="开始日期">
+                <span style="color: var(--text-muted); font-size: 0.78rem; padding: 0 2px;">至</span>
+                <input type="date" id="filterEndDate" onchange="applyFilters()" title="截止日期">
+            </div>
+        </div>
+
+        <!-- 查询/重置按钮组 -->
+        <div class="filter-btn-group">
+            <button type="button" class="btn btn-primary-purple" onclick="applyFilters()" style="height: 32px; padding: 0 14px; font-size: 0.82rem; font-weight: 700;">
+                🔍 查询
+            </button>
+            <button type="button" class="btn-outline-purple" onclick="resetFilters()" style="height: 32px; padding: 0 12px; font-size: 0.82rem;">
+                ↺ 重置
+            </button>
+        </div>
     </div>
 
     <!-- 活动列表容器 -->
@@ -420,6 +536,18 @@ input:checked + .slider:before {
                 <button type="button" class="btn-outline-purple" onclick="closeSeriesPicker()" style="padding: 6px 16px;">取消</button>
                 <button type="button" class="btn btn-primary-purple" onclick="confirmSeriesSelection()" style="padding: 6px 20px;">选定带回</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. 自定义删除/操作确认弹出层 (与全站设计风格一致) -->
+<div class="modal" id="customConfirmModal" style="display: none; z-index: 1300;">
+    <div class="modal-content" style="max-width: 380px; text-align: center; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+        <div class="modal-header" style="justify-content: center; font-size: 1.1rem; font-weight: 800; border: none; padding-bottom: 0;">✨ 温馨提示</div>
+        <p id="confirmMessage" style="font-size: 0.88rem; color: var(--text-main); margin: 15px 0 22px 0; line-height: 1.5;"></p>
+        <div class="modal-actions" style="justify-content: center; gap: 15px; display: flex;">
+            <button id="btnConfirmCancel" style="margin: 0; width: 90px; height: 36px; padding: 0; background: rgba(0, 0, 0, 0.05); border: 1px solid rgba(0, 0, 0, 0.15); color: var(--text-main, #374151); border-radius: 8px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">取消</button>
+            <button id="btnConfirmOK" style="margin: 0; width: 90px; height: 36px; padding: 0; background: #ef4444; border: 1px solid #ef4444; color: #fff; border-radius: 8px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">确定</button>
         </div>
     </div>
 </div>

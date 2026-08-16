@@ -104,10 +104,61 @@ def get_active_promotions_summary(db: Session) -> List[Dict[str, Any]]:
 def list_all_promotions(
     db: Session,
     page: int = 1,
-    page_size: int = 10
+    page_size: int = 10,
+    keyword: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ) -> Dict[str, Any]:
-    """获取所有未被软删除的促销活动列表（按创建时间倒序），支持分页"""
-    query = db.query(Promotion).filter(Promotion.is_deleted == False).order_by(Promotion.id.desc())
+    """获取所有未被软删除的促销活动列表（按创建时间倒序），支持多维度组合筛选及分页"""
+    query = db.query(Promotion).filter(Promotion.is_deleted == False)
+
+    # 1. 关键字筛选 (活动名称 / 说明)
+    if keyword and keyword.strip():
+        kw = f"%{keyword.strip()}%"
+        query = query.filter(
+            (Promotion.name.ilike(kw)) | (Promotion.description.ilike(kw))
+        )
+
+    # 2. 状态筛选
+    now = datetime.datetime.utcnow()
+    if status == "active":
+        query = query.filter(
+            Promotion.is_active == True,
+            Promotion.start_time <= now,
+            Promotion.end_time >= now
+        )
+    elif status == "upcoming":
+        query = query.filter(
+            Promotion.is_active == True,
+            Promotion.start_time > now
+        )
+    elif status == "ended":
+        query = query.filter(
+            Promotion.is_active == True,
+            Promotion.end_time < now
+        )
+    elif status == "disabled":
+        query = query.filter(
+            Promotion.is_active == False
+        )
+
+    # 3. 时间范围筛选 (活动与指定时间段有交集)
+    if start_date and start_date.strip():
+        try:
+            s_dt = datetime.datetime.strptime(f"{start_date.strip()} 00:00:00", "%Y-%m-%d %H:%M:%S")
+            query = query.filter(Promotion.end_time >= s_dt)
+        except Exception:
+            pass
+
+    if end_date and end_date.strip():
+        try:
+            e_dt = datetime.datetime.strptime(f"{end_date.strip()} 23:59:59", "%Y-%m-%d %H:%M:%S")
+            query = query.filter(Promotion.start_time <= e_dt)
+        except Exception:
+            pass
+
+    query = query.order_by(Promotion.id.desc())
     total = query.count()
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
     items = query.offset((page - 1) * page_size).limit(page_size).all()

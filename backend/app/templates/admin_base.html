@@ -103,18 +103,18 @@
                     </div>
                 </div>
 
-                <!-- 🎉 促销活动管理 -->
+                <!-- 🎉 优惠活动 -->
                 <div class="menu-group {% if active_tab.startswith('admin-promotions') %}open{% endif %}">
                     <div class="menu-item {% if active_tab.startswith('admin-promotions') %}active{% endif %}" onclick="toggleSubmenu('promotions-submenu')" id="menu-promotions-tab">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span>🎉</span>
-                            <span class="sidebar-text">促销活动管理</span>
+                            <span class="sidebar-text">优惠活动</span>
                         </div>
                         <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
                     </div>
                     <div class="submenu {% if active_tab.startswith('admin-promotions') %}open{% endif %}" id="promotions-submenu" style="max-height: {% if active_tab.startswith('admin-promotions') %}200px{% else %}0px{% endif %}; opacity: {% if active_tab.startswith('admin-promotions') %}1{% else %}0{% endif %};">
                         <a href="/admin/promotions" class="submenu-item {% if active_tab == 'admin-promotions-list' %}active{% endif %}" style="text-decoration: none; display: block; color: inherit;">
-                            🏷️ 节日打折活动
+                            🎉 优惠活动管理
                         </a>
                     </div>
                 </div>

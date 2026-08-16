@@ -86,13 +86,25 @@ def api_get_active_promotions_summary(
 def api_admin_list_promotions(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页条数"),
+    keyword: Optional[str] = Query(None, description="搜索关键字（活动名称/说明）"),
+    status: Optional[str] = Query(None, description="状态筛选: active | upcoming | ended | disabled"),
+    start_date: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="截止日期 YYYY-MM-DD"),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """
-    Admin 获取全部促销活动分页列表
+    Admin 获取全部促销活动分页列表（支持关键字、状态及日期范围组合筛选）
     """
-    return list_all_promotions(db=db, page=page, page_size=page_size)
+    return list_all_promotions(
+        db=db,
+        page=page,
+        page_size=page_size,
+        keyword=keyword,
+        status=status,
+        start_date=start_date,
+        end_date=end_date
+    )
 
 
 
