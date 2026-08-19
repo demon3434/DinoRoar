@@ -161,19 +161,6 @@ class PaginatedLogResponse(BaseModel):
     limit: int
     items: List[LogResponse]
 
-# System Settings Schemas
-class SystemSettingResponse(BaseModel):
-    host_ip: str
-    host_port: int
-    stt_url: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-class SystemSettingUpdate(BaseModel):
-    host_ip: str
-    host_port: int
-    stt_url: str
-
 
 # Sticker Schemas
 class StickerSyncPayload(BaseModel):
@@ -223,7 +210,11 @@ class StickerExchangeRequest(BaseModel):
     sticker_id: int
 
 class StickerSortRequest(BaseModel):
-    sticker_ids: List[int]
+    sticker_ids: Optional[List[int]] = None
+    ordered_ids: Optional[List[int]] = None
+
+    def get_ids(self) -> List[int]:
+        return self.ordered_ids or self.sticker_ids or []
 
 class StickerSeriesRenameRequest(BaseModel):
     name: str
@@ -232,7 +223,11 @@ class StickerSeriesToggleActiveRequest(BaseModel):
     is_active: bool
 
 class StickerSeriesSortRequest(BaseModel):
-    series_ids: List[int]
+    series_ids: Optional[List[int]] = None
+    ordered_ids: Optional[List[int]] = None
+
+    def get_ids(self) -> List[int]:
+        return self.ordered_ids or self.series_ids or []
 
 class StickerUpdateRequest(BaseModel):
     name: str
@@ -388,6 +383,140 @@ class PromotionPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# ===================================================================
+# 签到与蛋能量变动账本模型 (Check-in & Egg Energy Ledger Schemas)
+# ===================================================================
+
+class CheckInRequest(BaseModel):
+    request_uuid: str
+
+
+class CheckInRecordDto(BaseModel):
+    id: int
+    energy_reward: int
+    streak_bonus: int
+    is_crit: bool
+    streak_days: int
+    created_at: str
+
+
+class WeeklyCheckInDayDto(BaseModel):
+    date: str
+    day_of_week: int
+    checked_in: bool
+    energy_reward: int
+    streak_bonus: int
+    is_crit: bool
+
+
+class CheckInStatusResponse(BaseModel):
+    has_checked_in_today: bool
+    today_date: str
+    streak_days: int
+    current_egg_energy: int
+    today_record: Optional[CheckInRecordDto] = None
+    weekly_history: List[WeeklyCheckInDayDto] = []
+
+
+class CheckInResultResponse(BaseModel):
+    success: bool
+    already_checked_in: bool
+    checkin_id: int
+    total_reward: int
+    base_reward: int
+    streak_bonus: int
+    is_crit: bool
+    streak_days: int
+    total_egg_energy: int
+    message: str
+
+
+class CheckInConfigDto(BaseModel):
+    base_min: int
+    base_max: int
+    crit_rate: float
+    crit_min: int
+    crit_max: int
+    streak_enabled: bool
+    streak_rules_json: str
+
+
+class EnergyAssetDisplayDto(BaseModel):
+    title: str
+    subtitle: Optional[str] = ""
+    badge_label: str
+    type_icon: Optional[str] = "default"
+    image_url: Optional[str] = None
+    theme_color: str = "#10B981"
+    direction: Optional[str] = "EARN"
+    detail_info: Optional[dict] = None
+
+
+class EnergyTransactionDto(BaseModel):
+    id: int
+    event_type_id: int
+    event_name: str
+    change_amount: int
+    balance_after: int
+    target_type_id: int
+    target_id: int
+    request_uuid: Optional[str] = None
+    transaction_uuid: Optional[str] = None
+    created_at: str
+    month_group: str = ""
+    title: Optional[str] = None
+    subtitle: Optional[str] = ""
+    badge_label: Optional[str] = None
+    type_icon: Optional[str] = "default"
+    image_url: Optional[str] = None
+    theme_color: Optional[str] = "#10B981"
+    direction: Optional[str] = "EARN"
+    detail_info: Optional[dict] = None
+    asset_display: Optional[EnergyAssetDisplayDto] = None
+
+
+class EnergySummaryDto(BaseModel):
+    current_balance: int = 0
+    today_income: int = 0
+    today_expense: int = 0
+    week_income: int = 0
+    week_expense: int = 0
+    month_total_income: int = 0
+    month_total_expense: int = 0
+    month_net: int = 0
+    last_month_income: int = 0
+    last_month_expense: int = 0
+    year_income: int = 0
+    year_expense: int = 0
+
+
+
+class EnergyTransactionPageResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    summary: Optional[EnergySummaryDto] = None
+    items: List[EnergyTransactionDto]
+
+
+class AdminEnergyTransactionDto(EnergyTransactionDto):
+    user_id: int
+    username: str
+    nickname: Optional[str] = None
+
+
+class AdminEnergyTransactionPageResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    total_granted: int = 0
+    total_consumed: int = 0
+    net_circulation: int = 0
+    items: List[AdminEnergyTransactionDto]
+
+
 
 
 

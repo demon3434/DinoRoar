@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # DinoRoar 主后端服务
   app:
-    image: crpi-tyyqcg8a2rpatesk.cn-shanghai.personal.cr.aliyuncs.com/zixidaxian/dinoroar-app:0.1
+    image: crpi-tyyqcg8a2rpatesk.cn-shanghai.personal.cr.aliyuncs.com/zixidaxian/dinoroar-app:0.2
     container_name: dinoroar-app
     restart: unless-stopped
     ports:

@@ -6,7 +6,9 @@ from typing import List, Optional
 from ..database import get_db
 from ..models import User
 from ..schemas import UserResponse, UserCreate, UserResetLock
+from .. import schemas
 from ..auth import get_current_admin, get_password_hash
+
 from ..services.cleanup import perform_orphan_cleanup, cleanup_canvas_orphans, cleanup_running
 from ..services.stickers.storage import cleanup_sticker_orphans
 
@@ -319,3 +321,62 @@ async def change_admin_password(
     current_admin.hashed_password = get_password_hash(payload.new_password)
     db.commit()
     return {"message": "Administrator password changed successfully"}
+
+
+# ===================================================================
+# 签到随机算法与蛋能量调控 API (Admin Check-in & Energy Configuration)
+# ===================================================================
+
+@router.get("/checkin/config", response_model=schemas.CheckInConfigDto)
+async def get_admin_checkin_config(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    获取当前签到随机算法与连签加成配置
+    """
+    from ..services.checkin_service import CheckInService
+    config = CheckInService.get_config(db)
+    return config
+
+
+@router.post("/checkin/config", response_model=schemas.CheckInConfigDto)
+async def update_admin_checkin_config(
+    payload: schemas.CheckInConfigDto,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    更新签到随机算法与连签加成配置
+    """
+    # 基础校验
+    if payload.base_min > payload.base_max:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="基础最小能量不能大于基础最大能量"
+        )
+    if payload.crit_min > payload.crit_max:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="暴击最小能量不能大于暴击最大能量"
+        )
+    if not (0 <= payload.crit_rate <= 1):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="暴击概率必须在 0 到 1 之间 (例如 0.15 代表 15%)"
+        )
+
+    from ..services.checkin_service import CheckInService
+    config = CheckInService.get_config(db)
+    config.base_min = payload.base_min
+    config.base_max = payload.base_max
+    config.crit_rate = payload.crit_rate
+    config.crit_min = payload.crit_min
+    config.crit_max = payload.crit_max
+    config.streak_enabled = payload.streak_enabled
+    config.streak_rules_json = payload.streak_rules_json
+
+    db.commit()
+    db.refresh(config)
+    return config
+

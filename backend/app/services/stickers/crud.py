@@ -129,6 +129,11 @@ def soft_delete_sticker(db: Session, sticker_id: int):
     ).first()
     if not sticker:
         raise ValueError("指定贴纸不存在或已被删除")
+
+    series = db.query(StickerSeries).filter(StickerSeries.id == sticker.series_id).first()
+    if series and (series.name == "3D恐龙" or series.id == 1):
+        raise ValueError("系统内置贴纸不允许删除，但可以停用")
+
     sticker.is_deleted = True
 
     # 紧凑重排剩余贴纸 (1..N)
@@ -154,6 +159,9 @@ def soft_delete_sticker_series(db: Session, series_id: int):
     ).first()
     if not series:
         raise ValueError("指定分类系列不存在或已被删除")
+
+    if series.name == "3D恐龙" or series.id == 1:
+        raise ValueError("系统内置贴纸系列不允许删除，但可以停用")
 
     active_count = db.query(StickerConfig).filter(
         StickerConfig.series_id == series_id,
@@ -217,6 +225,8 @@ def cascade_delete_series(db: Session, series_id: int) -> bool:
     series = db.query(StickerSeries).filter(StickerSeries.id == series_id).first()
     if not series:
         return False
+    if series.name == "3D恐龙" or series.id == 1:
+        raise ValueError("系统内置贴纸系列不允许删除，但可以停用")
     series.is_deleted = True
     db.query(StickerConfig).filter(StickerConfig.series_id == series_id).update(
         {StickerConfig.is_deleted: True}
@@ -236,9 +246,24 @@ def batch_delete_stickers(db: Session, sticker_ids: list) -> int:
     if not stickers:
         return 0
 
+    # 过滤掉系统内置贴纸
+    deletable_stickers = []
+    has_builtin = False
+    for st in stickers:
+        s = db.query(StickerSeries).filter(StickerSeries.id == st.series_id).first()
+        if s and (s.name == "3D恐龙" or s.id == 1):
+            has_builtin = True
+            continue
+        deletable_stickers.append(st)
+
+    if not deletable_stickers:
+        if has_builtin:
+            raise ValueError("选中的贴纸均为系统内置贴纸，不允许删除，但可以停用")
+        return 0
+
     affected_series_ids = set()
     deleted_count = 0
-    for st in stickers:
+    for st in deletable_stickers:
         st.is_deleted = True
         affected_series_ids.add(st.series_id)
         deleted_count += 1

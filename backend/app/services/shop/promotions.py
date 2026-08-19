@@ -31,7 +31,7 @@ def get_active_promotion_targets(db: Session) -> List[PromotionTarget]:
     """
     获取当前所有有效且处于生效时间窗口内的促销规则
     """
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     return db.query(PromotionTarget).join(Promotion).filter(
         Promotion.is_active == True,
         Promotion.is_deleted == False,
@@ -43,7 +43,7 @@ def get_active_promotions_summary(db: Session) -> List[Dict[str, Any]]:
     """
     获取当前生效活动简报（包含活动下所有规则的结构化描述，用于客户端横幅及首页微徽标）
     """
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     promotions = db.query(Promotion).filter(
         Promotion.is_active == True,
         Promotion.is_deleted == False,
@@ -121,7 +121,7 @@ def list_all_promotions(
         )
 
     # 2. 状态筛选
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     if status == "active":
         query = query.filter(
             Promotion.is_active == True,

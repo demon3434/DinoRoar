@@ -278,15 +278,21 @@ def exchange_shop_items(
             "current_price": current_price
         })
 
-    # 校验蛋能量余额
-    if user.egg_energy < total_cost:
-        raise HTTPException(
-            status_code=400,
-            detail=f"蛋能量不足！本次兑换需 {total_cost} 蛋能量，当前剩余 {user.egg_energy} 蛋能量"
-        )
-
-    # 扣除能量与保存背包
-    user.egg_energy -= total_cost
+    # 通过统一能量引擎逐项扣减蛋能量并写入流水
+    import uuid
+    from ..energy_service import EnergyEngineService
+    for p_item in purchased_items:
+        if p_item["current_price"] > 0:
+            EnergyEngineService.apply_transaction(
+                db=db,
+                user_id=user_id,
+                event_type_id=301,  # SHOP_EXCHANGE
+                change_amount=-p_item["current_price"],
+                target_type_id=1,   # SHOP_ITEM
+                target_id=p_item["shop_item_id"],
+                request_uuid=str(uuid.uuid4()),
+                commit=False
+            )
 
     # 序列化贴纸背包 "1001:2,1002:1"
     user.sticker_inventory = ",".join([f"{sid}:{cnt}" for sid, cnt in sorted(sticker_inv.items())])
@@ -298,6 +304,7 @@ def exchange_shop_items(
 
     return {
         "success": True,
+
         "total_original_cost": total_original_cost,
         "total_cost": total_cost,
         "saved_energy": max(0, total_original_cost - total_cost),

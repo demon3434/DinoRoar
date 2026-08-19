@@ -1,7 +1,7 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 
 from ..database import get_db
@@ -12,7 +12,7 @@ from ..schemas import (
     CanvasInstanceResponse,
     CanvasSyncPayload
 )
-from ..auth import get_current_user
+from ..auth import get_current_user, get_optional_current_user
 from ..services import canvases_service
 
 router = APIRouter(prefix="/api/canvases", tags=["Canvases"])
@@ -25,7 +25,7 @@ class CanvasSeriesCreate(BaseModel):
     sort_order: int = 0
 
 class CanvasSetCreate(BaseModel):
-    series_id: int
+    series_id: Optional[int] = None
     name: str
     description: Optional[str] = None
     exchange_price: int = 50
@@ -43,10 +43,25 @@ class CanvasSetUpdate(BaseModel):
     sort_order: int = 0
 
 class CanvasSeriesSortPayload(BaseModel):
-    series_ids: List[int]
+    series_ids: Optional[List[int]] = None
+    ordered_ids: Optional[List[int]] = None
+
+    def get_ids(self) -> List[int]:
+        return self.ordered_ids or self.series_ids or []
 
 class CanvasSetSortPayload(BaseModel):
+    series_id: Optional[int] = None
+    set_ids: Optional[List[int]] = None
+    ordered_ids: Optional[List[int]] = None
+
+    def get_ids(self) -> List[int]:
+        return self.ordered_ids or self.set_ids or []
+
+class CanvasSetBatchDeleteRequest(BaseModel):
     set_ids: List[int]
+
+class CanvasExportPayload(BaseModel):
+    series_ids: Optional[List[int]] = None
 
 
 @router.get("/config", response_model=List[CanvasSeriesResponse])
@@ -57,7 +72,7 @@ async def get_canvases_config(
     """
     获取系统中所有可用的画布系列及内部嵌套的画布套、图片实例列表
     """
-    return canvases_service.get_canvases_config(db, only_active=True, apply_promo=not for_admin)
+    return canvases_service.get_canvases_config(db, only_active=not for_admin, apply_promo=not for_admin)
 
 
 
@@ -167,6 +182,8 @@ async def create_canvas_series(
 
 
 @router.put("/admin/series/sort")
+@router.post("/admin/series/sort")
+@router.post("/admin/series/reorder")
 async def sort_canvas_series(
     payload: CanvasSeriesSortPayload,
     current_user: User = Depends(get_current_user),
@@ -177,7 +194,7 @@ async def sort_canvas_series(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    canvases_service.sort_canvas_series(db, payload.series_ids)
+    canvases_service.sort_canvas_series(db, payload.get_ids())
     return {"detail": "系列分类排序更新成功"}
 
 
@@ -210,6 +227,7 @@ async def toggle_canvas_series_active(
     return canvases_service.toggle_canvas_series_active(db, series_id)
 
 
+@router.delete("/admin/series/{series_id}")
 @router.delete("/admin/series/{series_id}/cascade")
 async def delete_canvas_series_cascade(
     series_id: int,
@@ -236,6 +254,8 @@ async def create_canvas_set(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
+    if not payload.series_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少 series_id 参数")
     res = canvases_service.create_canvas_set(
         db,
         payload.series_id,
@@ -248,8 +268,20 @@ async def create_canvas_set(
     sync_asset_shop_item(db, item_type="CANVAS_SET", target_id=res.id, original_price=payload.exchange_price, sort_order=payload.sort_order)
     return res
 
+@router.post("/admin/series/{series_id}/sets", response_model=CanvasSetResponse)
+async def create_canvas_set_by_series(
+    series_id: int,
+    payload: CanvasSetCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    payload.series_id = series_id
+    return await create_canvas_set(payload, current_user, db)
+
 
 @router.put("/admin/sets/sort")
+@router.post("/admin/sets/sort")
+@router.post("/admin/sets/reorder")
 async def sort_canvas_sets(
     payload: CanvasSetSortPayload,
     current_user: User = Depends(get_current_user),
@@ -260,7 +292,7 @@ async def sort_canvas_sets(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    canvases_service.sort_canvas_sets(db, payload.set_ids)
+    canvases_service.sort_canvas_sets(db, payload.get_ids())
     return {"detail": "商品套件排序更新成功"}
 
 
@@ -326,10 +358,31 @@ async def delete_canvas_set(
     return {"detail": "商品套件及内部图片实例已成功软删除"}
 
 
+@router.post("/admin/sets/batch-delete")
+async def batch_delete_canvas_sets(
+    payload: CanvasSetBatchDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    批量软删除画布商品套件及下属所有图片实例 (仅限管理员)
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
+    count = canvases_service.batch_delete_canvas_sets(db, payload.set_ids)
+    return {
+        "status": "success",
+        "message": f"已成功批量删除 {count} 套画布及其下属裁剪图片",
+        "deleted_count": count
+    }
+
+
 
 @router.post("/admin/upload", response_model=CanvasInstanceResponse)
+@router.post("/admin/instances", response_model=CanvasInstanceResponse)
 async def upload_canvas_instance(
-    canvas_set_id: int = Form(...),
+    canvas_set_id: Optional[int] = Form(None),
+    set_id: Optional[int] = Form(None),
     aspect_ratio: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -341,10 +394,31 @@ async def upload_canvas_instance(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
 
-    if aspect_ratio not in ["16:9", "4:3", "1:1", "2:1"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的长宽比，限定为 16:9, 4:3, 1:1, 2:1")
+    target_set_id = canvas_set_id or set_id
+    if not target_set_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少 canvas_set_id 或 set_id 参数")
 
-    return await canvases_service.process_and_save_canvas_instance(db, canvas_set_id, aspect_ratio, file)
+    if aspect_ratio not in ["16:9", "4:3", "1:1", "2:1", "9:16", "3:4"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的长宽比")
+
+    return await canvases_service.process_and_save_canvas_instance(db, target_set_id, aspect_ratio, file)
+
+@router.post("/admin/sets/{set_id}/upload-ratio", response_model=CanvasInstanceResponse)
+async def upload_canvas_instance_by_set(
+    set_id: int,
+    aspect_ratio: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return await upload_canvas_instance(
+        canvas_set_id=set_id,
+        set_id=set_id,
+        aspect_ratio=aspect_ratio,
+        file=file,
+        current_user=current_user,
+        db=db
+    )
 
 
 @router.post("/admin/instances/{instance_id}/toggle-active", response_model=CanvasInstanceResponse)
@@ -383,10 +457,15 @@ class CanvasImportConfirmRequest(BaseModel):
     temp_token: str
     selected_series_names: List[str]
     conflict_resolution: str
+    selected_sets_map: Optional[Dict[str, List[str]]] = None
 
 @router.get("/admin/export")
+@router.get("/export")
+@router.post("/admin/export")
+@router.post("/export")
 async def export_canvases(
-    series_ids: str,
+    series_ids: Optional[str] = None,
+    payload: Optional[CanvasExportPayload] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -396,7 +475,12 @@ async def export_canvases(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
     try:
-        id_list = [int(x) for x in series_ids.split(",") if x.strip()]
+        if payload and payload.series_ids:
+            id_list = payload.series_ids
+        elif series_ids:
+            id_list = [int(x) for x in series_ids.split(",") if x.strip()]
+        else:
+            id_list = [s.id for s in db.query(CanvasSeries).filter(CanvasSeries.is_deleted == False).all()]
     except Exception:
         raise HTTPException(status_code=400, detail="非法的 series_ids 格式")
         
@@ -414,6 +498,7 @@ async def export_canvases(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/admin/import/preview")
+@router.post("/import/preview")
 async def import_canvases_preview(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -431,7 +516,47 @@ async def import_canvases_preview(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+from fastapi.responses import StreamingResponse, FileResponse
+
+@router.get("/admin/import/preview-file")
+@router.get("/import/preview-file")
+async def get_import_preview_file(
+    temp_token: str,
+    file_path: str,
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    """
+    按需获取导入缓存中的原图（供 Lightbox 查看，避免将全部原图打包进初始 JSON 导致前端卡顿）
+    """
+    safe_token = os.path.basename(temp_token.strip())
+    if not safe_token:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    target_base = canvases_import_export.TEMP_IMPORT_DIR / safe_token
+    real_target_base = os.path.realpath(target_base)
+    requested_file = os.path.realpath(target_base / file_path)
+    if not requested_file.startswith(real_target_base) or not os.path.exists(requested_file):
+        raise HTTPException(status_code=404, detail="图片不存在或已过期")
+    return FileResponse(requested_file)
+
+class CanvasImportCancelRequest(BaseModel):
+    temp_token: str
+
+@router.post("/admin/import/cancel")
+@router.post("/import/cancel")
+async def import_canvases_cancel(
+    payload: CanvasImportCancelRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    取消画布包导入并清理临时解压目录 (仅限管理员)
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
+    canvases_import_export.cancel_import_temp(payload.temp_token)
+    return {"status": "success", "message": "临时导入数据已清理"}
+
 @router.post("/admin/import/confirm")
+@router.post("/import/confirm")
 async def import_canvases_confirm(
     payload: CanvasImportConfirmRequest,
     current_user: User = Depends(get_current_user),
@@ -447,6 +572,7 @@ async def import_canvases_confirm(
             temp_token=payload.temp_token,
             selected_series_names=payload.selected_series_names,
             conflict_resolution=payload.conflict_resolution,
+            selected_sets_map=payload.selected_sets_map,
             db=db
         )
         return res

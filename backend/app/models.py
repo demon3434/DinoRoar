@@ -312,6 +312,108 @@ class PromotionTarget(Base):
     promotion = orm_relationship("Promotion", back_populates="targets")
 
 
+class EggEnergyTargetType(Base):
+    """
+    目标实体元数据维度字典表
+    定义流水中的 target_id 映射到哪张物理数据表与展示属性
+    """
+    __tablename__ = "egg_energy_target_types"
+
+    target_type_id = Column(Integer, primary_key=True)  # 1=商品, 2=签到, 3=日记, 4=奖品
+    target_code = Column(String, unique=True, nullable=False, index=True)  # "SHOP_ITEM", "CHECK_IN", "LOG", "PRIZE"
+    table_name = Column(String, nullable=False)  # "shop_items", "check_in_records", "logs", "prizes"
+    pk_column = Column(String, nullable=False, default="id")  # 统一关联物理主键 "id"
+    title_column = Column(String, nullable=False)  # 展示标题列名
+    image_column = Column(String, nullable=True)  # 展示图片URL列名
+    badge_label = Column(String, nullable=False)  # UI展示角标
+
+
+class EggEnergyEventType(Base):
+    """
+    行为事件类型维度字典表
+    定义流水发生时的业务行为、变动方向及显示名称
+    """
+    __tablename__ = "egg_energy_event_types"
+
+    event_type_id = Column(Integer, primary_key=True)  # 101, 201, 301, 401...
+    event_code = Column(String, unique=True, nullable=False, index=True)  # "DAILY_CHECKIN", "LOG_REWARD", "SHOP_EXCHANGE"
+    target_type_id = Column(Integer, ForeignKey("egg_energy_target_types.target_type_id"), nullable=False)
+    direction = Column(String, nullable=False)  # "EARN" 或 "SPEND"
+    display_name = Column(String, nullable=False)  # 如 "每日敲蛋签到", "手账日记奖励", "手账商城兑换"
+    icon_key = Column(String, default="default", nullable=False)  # 备用矢量图标
+
+    target_type = orm_relationship("EggEnergyTargetType")
+
+
+class CheckInRecord(Base):
+    """
+    每日签到历史记录表
+    全量记录用户的每一次签到足迹、获得的随机奖励与暴击状态
+    """
+    __tablename__ = "check_in_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    check_in_date = Column(String(10), nullable=False)  # "YYYY-MM-DD"
+    energy_reward = Column(Integer, nullable=False)  # 基础随机奖励
+    streak_bonus = Column(Integer, nullable=False, default=0)  # 连签加成奖励
+    is_crit = Column(Boolean, nullable=False, default=False)  # 是否触发欧皇暴击
+    streak_days = Column(Integer, nullable=False, default=1)  # 截止当日连续签到天数
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    user = orm_relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "check_in_date", name="uq_user_checkin_date"),
+        Index("idx_checkin_user_date", "user_id", "check_in_date"),
+    )
+
+
+class CheckInConfig(Base):
+    """
+    签到随机算法与连签加成配置表 (Admin 可视化配置)
+    """
+    __tablename__ = "check_in_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    base_min = Column(Integer, nullable=False, default=5)  # 基础日常保底能量
+    base_max = Column(Integer, nullable=False, default=15)  # 基础日常最高能量
+    crit_rate = Column(Float, nullable=False, default=0.15)  # 欧皇暴击概率 (15%)
+    crit_min = Column(Integer, nullable=False, default=30)  # 暴击最小能量
+    crit_max = Column(Integer, nullable=False, default=66)  # 暴击最大能量
+    streak_enabled = Column(Boolean, nullable=False, default=True)  # 连签加成开关
+    streak_rules_json = Column(Text, nullable=False, default='{"3": 5, "7": 20}')  # 连签天数: 加成值 JSON
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+
+
+class EggEnergyTransaction(Base):
+    """
+    蛋能量事实流水账本 (Egg Energy Transactions Ledger)
+    全量记录每一笔蛋能量的获取与消耗明细，纯整型强类型关联
+    """
+    __tablename__ = "egg_energy_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type_id = Column(Integer, ForeignKey("egg_energy_event_types.event_type_id"), nullable=False)
+    change_amount = Column(Integer, nullable=False)  # 变动数值 (正数获取，负数消耗)
+    balance_after = Column(Integer, nullable=False)  # 变动后的瞬时余额
+    target_type_id = Column(Integer, ForeignKey("egg_energy_target_types.target_type_id"), nullable=False)
+    target_id = Column(Integer, nullable=False)  # 严格强类型整型外键，关联目标业务表的 id
+    request_uuid = Column(String(36), unique=True, nullable=False, index=True)  # 幂等唯一键
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    user = orm_relationship("User")
+    event_type = orm_relationship("EggEnergyEventType")
+    target_type = orm_relationship("EggEnergyTargetType")
+
+    __table_args__ = (
+        Index("idx_energy_tx_user_created", "user_id", "created_at"),
+        Index("idx_energy_tx_target", "target_type_id", "target_id"),
+    )
+
+
+
 
 
 

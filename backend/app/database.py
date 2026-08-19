@@ -5,7 +5,6 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from .config import settings
-from .system_settings_manager import update_system_settings
 
 logger = logging.getLogger("DinoRoar.database")
 
@@ -64,23 +63,3 @@ def get_db():
     finally:
         db.close()
 
-def migrate_and_cleanup_legacy_settings():
-    """
-    Checks if legacy system_settings table exists in DB.
-    If so, exports its settings to settings.json and drops the table.
-    """
-    try:
-        inspector = inspect(engine)
-        if inspector.has_table("system_settings"):
-            logger.info("Found legacy system_settings table. Exporting data to settings.json...")
-            with engine.begin() as conn:
-                result = conn.execute(text("SELECT host_ip, host_port, stt_url FROM system_settings LIMIT 1")).fetchone()
-                if result:
-                    host_ip, host_port, stt_url = result[0], result[1], result[2]
-                    update_system_settings(host_ip or "", host_port or 8080, stt_url or "")
-                    logger.info("Exported legacy system_settings to data/settings.json.")
-                
-                conn.execute(text("DROP TABLE IF EXISTS system_settings"))
-                logger.info("Dropped legacy system_settings table from database.")
-    except Exception as e:
-        logger.error(f"Error migrating legacy system_settings table: {e}")

@@ -13,11 +13,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
     代理客户端的音频文件并透传至 SenseVoice STT 引擎进行转译。
     支持 WAV、MP3、AAC、M4A 等常见音频格式。
     """
-    from ..system_settings_manager import load_system_settings
-    sys_settings = load_system_settings()
-    configured_stt_url = sys_settings.get("stt_url", "").strip()
-    
-    target_url = configured_stt_url or settings.stt_api_url or "http://stt:18000/api/transcribe"
+    target_url = settings.stt_api_url or "http://stt:18000/api/transcribe"
     logger.info(f"转发 STT 音频转译请求至: {target_url}")
     
     try:

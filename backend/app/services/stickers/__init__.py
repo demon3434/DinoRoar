@@ -27,6 +27,7 @@ from .import_export import (
     export_sticker_series_zip,
     preview_import_zip,
     confirm_import_stickers,
+    cancel_import_temp,
 )
 
 from .storage import (
@@ -59,6 +60,7 @@ __all__ = [
     "export_sticker_series_zip",
     "preview_import_zip",
     "confirm_import_stickers",
+    "cancel_import_temp",
     "STATIC_DIR",
     "STICKERS_UPLOAD_DIR",
     "TEMP_IMPORT_DIR",

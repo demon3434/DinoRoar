@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..models import User, StickerConfig
@@ -141,6 +142,9 @@ async def create_sticker_series(
     series.stickers = []
     return series
 
+class StickerExportPayload(BaseModel):
+    series_ids: Optional[List[int]] = None
+
 @router.post("/admin/upload", response_model=StickerConfigResponse)
 async def upload_sticker(
     file: UploadFile,
@@ -160,6 +164,11 @@ async def upload_sticker(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="仅限管理员操作"
+        )
+    if not series_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少 series_id 参数"
         )
     if len(name) > 6:
         raise HTTPException(
@@ -215,7 +224,32 @@ async def upload_sticker(
     db.refresh(sticker_cfg)
     return sticker_cfg
 
+@router.post("/admin/series/{series_id}/stickers", response_model=StickerConfigResponse)
+async def upload_sticker_by_series(
+    series_id: int,
+    file: UploadFile,
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    sort_order: int = Form(0),
+    exchange_price: int = Form(20),
+    remove_background: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return await upload_sticker(
+        file=file,
+        series_id=series_id,
+        name=name,
+        description=description,
+        sort_order=sort_order,
+        exchange_price=exchange_price,
+        remove_background=remove_background,
+        current_user=current_user,
+        db=db
+    )
+
 @router.put("/admin/sort")
+@router.post("/admin/sort")
 async def sort_admin_stickers(
     payload: StickerSortRequest,
     current_user: User = Depends(get_current_user),
@@ -226,10 +260,23 @@ async def sort_admin_stickers(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    stickers_service.sort_stickers(db, payload.sticker_ids)
+    ids = payload.get_ids()
+    stickers_service.sort_stickers(db, ids)
     return {"status": "success", "message": "重排序保存成功"}
 
+@router.post("/admin/series/{series_id}/stickers/reorder")
+@router.put("/admin/series/{series_id}/stickers/reorder")
+async def sort_admin_stickers_by_series(
+    series_id: int,
+    payload: StickerSortRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return await sort_admin_stickers(payload, current_user, db)
+
 @router.put("/admin/series/sort")
+@router.post("/admin/series/sort")
+@router.post("/admin/series/reorder")
 async def sort_admin_series(
     payload: StickerSeriesSortRequest,
     current_user: User = Depends(get_current_user),
@@ -240,7 +287,8 @@ async def sort_admin_series(
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
-    stickers_service.sort_sticker_series(db, payload.series_ids)
+    ids = payload.get_ids()
+    stickers_service.sort_sticker_series(db, ids)
     return {"status": "success", "message": "分类重排序保存成功"}
 
 @router.put("/admin/series/{series_id}", response_model=StickerSeriesResponse)
@@ -291,6 +339,7 @@ async def toggle_active_admin_series(
 
 
 @router.delete("/admin/{sticker_id}")
+@router.delete("/admin/stickers/{sticker_id}")
 async def delete_admin_sticker(
     sticker_id: int,
     current_user: User = Depends(get_current_user),
@@ -328,6 +377,7 @@ async def delete_admin_series(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.put("/admin/{sticker_id}", response_model=StickerConfigResponse)
+@router.put("/admin/stickers/{sticker_id}", response_model=StickerConfigResponse)
 async def update_admin_sticker(
     sticker_id: int,
     name: str = Form(...),
@@ -386,8 +436,12 @@ async def update_admin_sticker(
 
 
 @router.get("/export")
+@router.get("/admin/export")
+@router.post("/export")
+@router.post("/admin/export")
 async def export_stickers(
-    series_ids: str,
+    series_ids: Optional[str] = None,
+    payload: Optional[StickerExportPayload] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -397,7 +451,13 @@ async def export_stickers(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
     try:
-        ids = [int(x.strip()) for x in series_ids.split(",") if x.strip()]
+        if payload and payload.series_ids:
+            ids = payload.series_ids
+        elif series_ids:
+            ids = [int(x.strip()) for x in series_ids.split(",") if x.strip()]
+        else:
+            from ..models import StickerSeries
+            ids = [s.id for s in db.query(StickerSeries).filter(StickerSeries.is_deleted == False).all()]
         zip_io = stickers_service.export_sticker_series_zip(db, ids)
         time_str = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         filename = f"dinoroar_stickers_export_{time_str}.zip"
@@ -410,6 +470,7 @@ async def export_stickers(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.post("/import/preview")
+@router.post("/admin/import/preview")
 async def preview_import_stickers(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
@@ -427,7 +488,25 @@ async def preview_import_stickers(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+class StickerImportCancelRequest(BaseModel):
+    temp_token: str
+
+@router.post("/import/cancel")
+@router.post("/admin/import/cancel")
+async def cancel_import_stickers(
+    payload: StickerImportCancelRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    取消贴纸包导入并清理临时解压目录 (仅限管理员)
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅限管理员操作")
+    stickers_service.cancel_import_temp(payload.temp_token)
+    return {"status": "success", "message": "临时导入数据已清理"}
+
 @router.post("/import/confirm")
+@router.post("/admin/import/confirm")
 async def confirm_import_stickers(
     payload: StickerImportConfirmRequest,
     current_user: User = Depends(get_current_user),

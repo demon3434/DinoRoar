@@ -139,12 +139,26 @@ def delete_canvas_series_cascade(db: Session, series_id: int):
     series = db.query(CanvasSeries).filter(CanvasSeries.id == series_id, CanvasSeries.is_deleted == False).first()
     if not series:
         raise HTTPException(status_code=404, detail="画布分类系列不存在")
+
+    has_builtin_set = db.query(CanvasSet).filter(CanvasSet.series_id == series_id, CanvasSet.id == 3001, CanvasSet.is_deleted == False).first()
+    if series.name == "恐龙世界" or series.id == 1 or has_builtin_set:
+        raise HTTPException(status_code=400, detail="系统内置画布系列（恐龙世界）不允许删除，但可以停用")
+
     series.is_deleted = True
     
     sets = db.query(CanvasSet).filter(CanvasSet.series_id == series_id).all()
+    set_ids = [cset.id for cset in sets]
     for cset in sets:
         cset.is_deleted = True
         db.query(CanvasInstance).filter(CanvasInstance.canvas_set_id == cset.id).update({"is_deleted": True})
+    
+    if set_ids:
+        from ..models import ShopItem
+        db.query(ShopItem).filter(
+            ShopItem.item_type == "CANVAS_SET",
+            ShopItem.target_id.in_(set_ids)
+        ).update({"is_deleted": True, "is_active": False}, synchronize_session=False)
+
     db.commit()
 
 def sort_canvas_series(db: Session, series_ids: List[int]):
@@ -283,6 +297,60 @@ def delete_canvas_set(db: Session, set_id: int):
 
     db.commit()
 
+def batch_delete_canvas_sets(db: Session, set_ids: List[int]) -> int:
+    """
+    批量软删除画布商品套件、下属图片实例，同步下架商城商品条目，并紧凑重排各受影响系列的剩余画布
+    系统预设底图（id == 3001）自动跳过，绝不删除
+    返回成功软删除的套件数量
+    """
+    if not set_ids:
+        return 0
+
+    valid_set_ids = [sid for sid in set_ids if sid != 3001]
+    if not valid_set_ids:
+        return 0
+
+    csets = db.query(CanvasSet).filter(
+        CanvasSet.id.in_(valid_set_ids),
+        CanvasSet.is_deleted == False
+    ).all()
+
+    if not csets:
+        return 0
+
+    affected_series_ids = set()
+    deleted_ids = []
+    for cset in csets:
+        cset.is_deleted = True
+        affected_series_ids.add(cset.series_id)
+        deleted_ids.append(cset.id)
+
+    # 批量软删除下属所有图片实例
+    db.query(CanvasInstance).filter(
+        CanvasInstance.canvas_set_id.in_(deleted_ids)
+    ).update({"is_deleted": True}, synchronize_session=False)
+
+    # 同步软删除并下架关联的 ShopItem
+    from ..models import ShopItem
+    db.query(ShopItem).filter(
+        ShopItem.item_type == "CANVAS_SET",
+        ShopItem.target_id.in_(deleted_ids)
+    ).update({"is_deleted": True, "is_active": False}, synchronize_session=False)
+
+    db.flush()
+
+    # 对所有受影响的系列分别进行紧凑重排
+    for s_id in affected_series_ids:
+        remaining_sets = db.query(CanvasSet).filter(
+            CanvasSet.series_id == s_id,
+            CanvasSet.is_deleted == False
+        ).order_by(CanvasSet.sort_order.asc(), CanvasSet.id.asc()).all()
+        for idx, s in enumerate(remaining_sets, start=1):
+            s.sort_order = idx
+
+    db.commit()
+    return len(deleted_ids)
+
 def sort_canvas_sets(db: Session, set_ids: List[int]):
     """
     更新商品套排序顺序 (1..N)
@@ -302,8 +370,8 @@ async def process_and_save_canvas_instance(db: Session, canvas_set_id: int, aspe
     try:
         content = await file.read()
         image = Image.open(io.BytesIO(content))
-        ratio_map = {"16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1.0, "2:1": 2.0}
-        r_val = ratio_map[aspect_ratio]
+        ratio_map = {"16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1.0, "2:1": 2.0, "9:16": 9 / 16, "3:4": 3 / 4}
+        r_val = ratio_map.get(aspect_ratio, 16 / 9)
         
         target_width = 1440
         target_height = int(target_width / r_val)

@@ -1,96 +1,52 @@
-import os
-from fastapi import APIRouter, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
 
 router = APIRouter(tags=["Web Pages"])
 
-# Setup Jinja2 templates directory
+# Setup SPA dist file path
 app_dir = Path(__file__).resolve().parent.parent
-templates_dir = app_dir / "templates"
-templates = Jinja2Templates(directory=str(templates_dir))
+spa_index_file = app_dir / "static" / "dist" / "index.html"
 
-@router.get("/login", response_class=HTMLResponse)
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0"
+}
+
+def _serve_spa():
+    if spa_index_file.exists():
+        return FileResponse(str(spa_index_file), headers=NO_CACHE_HEADERS)
+    return HTMLResponse(
+        content="""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>DinoRoar - 前端资源未就绪</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background: #070f1e; color: #fff;">
+            <h1>🦕 DinoRoar SPA 前端构建产物未就绪</h1>
+            <p>请先在 <code>frontend/</code> 目录执行 <code>npm run build</code> 并将产物同步至 <code>backend/app/static/dist/</code>。</p>
+        </body>
+        </html>
+        """,
+        status_code=503
+    )
+
+@router.get("/login")
 async def get_login_page(request: Request):
-    return templates.TemplateResponse(request, "login.html")
+    """登录单页入口"""
+    return _serve_spa()
 
 @router.get("/admin")
 async def get_admin_page(request: Request):
-    return RedirectResponse(url="/admin/users")
+    """管理控制台主页入口"""
+    return _serve_spa()
 
-@router.get("/admin/users", response_class=HTMLResponse)
-async def get_admin_users_page(request: Request):
-    return templates.TemplateResponse(request, "admin_users.html", {"active_tab": "admin-users-list"})
+@router.get("/admin/{subpath:path}")
+async def get_admin_subpaths(request: Request, subpath: str):
+    """管理控制台所有子路由入口（stickers, canvases, promotions, checkin, energy/ledger 等）"""
+    return _serve_spa()
 
-@router.get("/admin/settings", response_class=HTMLResponse)
-async def get_admin_settings_page(request: Request):
-    return templates.TemplateResponse(request, "admin_settings.html", {"active_tab": "admin-system-settings"})
-
-@router.get("/admin/maintenance", response_class=HTMLResponse)
-async def get_admin_maintenance_page(request: Request):
-    return templates.TemplateResponse(request, "admin_maintenance.html", {"active_tab": "admin-system-maintenance"})
-
-@router.get("/admin/personal")
-async def get_admin_personal_page(request: Request):
-    return RedirectResponse(url="/admin/password")
-
-@router.get("/admin/password", response_class=HTMLResponse)
-async def get_admin_password_page(request: Request):
-    return templates.TemplateResponse(request, "admin_password.html", {"active_tab": "admin-personal-password"})
-
-@router.get("/admin/theme", response_class=HTMLResponse)
-async def get_admin_theme_page(request: Request):
-    return templates.TemplateResponse(request, "admin_theme.html", {"active_tab": "admin-personal-theme"})
-
-@router.get("/", response_class=HTMLResponse)
-async def get_dashboard_page(request: Request):
-    return templates.TemplateResponse(request, "dashboard.html", {"active_tab": "dashboard"})
-
-@router.get("/dashboard", response_class=HTMLResponse)
-async def get_dashboard_tab_page(request: Request):
-    return templates.TemplateResponse(request, "dashboard.html", {"active_tab": "dashboard"})
-
-@router.get("/diary", response_class=HTMLResponse)
-async def get_diary_page(request: Request):
-    return templates.TemplateResponse(request, "diary.html", {"active_tab": "diary"})
-
-@router.get("/settings/persons", response_class=HTMLResponse)
-async def get_settings_persons_page(request: Request):
-    return templates.TemplateResponse(request, "settings_persons.html", {"active_tab": "settings-persons"})
-
-@router.get("/settings/personal", response_class=HTMLResponse)
-async def get_settings_personal_page(request: Request):
-    return templates.TemplateResponse(request, "settings_personal.html", {"active_tab": "settings-personal"})
-
-@router.get("/diary/detail", response_class=HTMLResponse)
-async def get_diary_detail_page(request: Request):
-    return templates.TemplateResponse(request, "diary_detail.html", {"active_tab": "diary"})
-
-@router.get("/stickers", response_class=HTMLResponse)
-async def get_stickers_page(request: Request):
-    return templates.TemplateResponse(request, "stickers.html", {"active_tab": "mall"})
-
-@router.get("/admin/stickers", response_class=HTMLResponse)
-async def get_admin_stickers_page(request: Request):
-    return templates.TemplateResponse(request, "admin_stickers.html", {"active_tab": "admin-stickers-list"})
-
-@router.get("/mall", response_class=HTMLResponse)
-async def get_mall_page(request: Request):
-    return templates.TemplateResponse(request, "mall.html", {"active_tab": "mall"})
-
-@router.get("/canvases", response_class=HTMLResponse)
-async def get_canvases_page(request: Request):
-    return templates.TemplateResponse(request, "canvases.html", {"active_tab": "mall"})
-
-@router.get("/admin/canvases", response_class=HTMLResponse)
-async def get_admin_canvases_page(request: Request):
-    return templates.TemplateResponse(request, "admin_canvases.html", {"active_tab": "admin-canvases-list"})
-
-@router.get("/admin/promotions", response_class=HTMLResponse)
-async def get_admin_promotions_page(request: Request):
-    return templates.TemplateResponse(request, "admin_promotions.html", {"active_tab": "admin-promotions-list"})
-
-
-
-
+@router.get("/")
+async def get_root_page(request: Request):
+    """根路径入口（由前端 Vue Router 自动重定向至 /admin/stickers）"""
+    return _serve_spa()

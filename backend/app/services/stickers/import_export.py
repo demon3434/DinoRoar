@@ -97,10 +97,63 @@ def export_sticker_series_zip(db: Session, series_ids: list) -> io.BytesIO:
     return memory_file
 
 
+def clean_stale_temp_imports(max_age_seconds: int = 1800):
+    """
+    清理临时导入目录中超过 30 分钟未处理的陈旧临时文件夹
+    """
+    if not TEMP_IMPORT_DIR.exists():
+        return
+    now = datetime.datetime.now().timestamp()
+    for item in TEMP_IMPORT_DIR.iterdir():
+        if item.is_dir():
+            try:
+                mtime = item.stat().st_mtime
+                if now - mtime > max_age_seconds:
+                    shutil.rmtree(item, ignore_errors=True)
+            except Exception:
+                pass
+
+
+def cancel_import_temp(temp_token: str):
+    """
+    取消贴纸包导入并立即清理对应的临时解压目录
+    """
+    if not temp_token:
+        return
+    safe_token = os.path.basename(temp_token.strip())
+    target_dir = TEMP_IMPORT_DIR / safe_token
+    if target_dir.exists():
+        shutil.rmtree(target_dir, ignore_errors=True)
+
+
+from PIL import Image
+
+def generate_sticker_thumbnail_b64(img_path: Path, max_dim: int = 160) -> str:
+    """
+    为前端贴纸网格生成轻量级缩略图 Base64，大幅降低内存占用
+    """
+    try:
+        with Image.open(img_path) as im:
+            im.thumbnail((max_dim, max_dim), Image.Resampling.BILINEAR)
+            buf = io.BytesIO()
+            if im.mode != "RGBA":
+                im = im.convert("RGBA")
+            im.save(buf, format="PNG", optimize=True)
+            return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception:
+        try:
+            with open(img_path, "rb") as imf:
+                return "data:image/png;base64," + base64.b64encode(imf.read()).decode("utf-8")
+        except Exception:
+            return ""
+
+
 def preview_import_zip(zip_bytes: bytes, db: Session) -> dict:
     """
     解压并安全校验上传的贴纸包，解析元数据并准备前端预览数据
     """
+    clean_stale_temp_imports()
+
     if len(zip_bytes) > 50 * 1024 * 1024:
         raise ValueError("上传的贴纸包不能超过 50MB")
 
@@ -155,12 +208,7 @@ def preview_import_zip(zip_bytes: bytes, db: Session) -> dict:
                 img_path = Path(root) / img_file
                 img_b64 = ""
                 if img_file and img_path.exists():
-                    try:
-                        with open(img_path, "rb") as imf:
-                            ext = img_path.suffix.lstrip(".").lower() or "png"
-                            img_b64 = f"data:image/{ext};base64," + base64.b64encode(imf.read()).decode("utf-8")
-                    except Exception:
-                        pass
+                    img_b64 = generate_sticker_thumbnail_b64(img_path, max_dim=160)
 
                 stickers_preview.append({
                     "name": st.get("name", ""),
@@ -343,14 +391,24 @@ def confirm_import_stickers(
                         )
                         db.add(sticker_cfg)
                         db.flush()
-                        logger.info(f"confirm_import_stickers: inserted new sticker id={sticker_cfg.id}")
+                    # 同步写入商城统一商品表
+                    from ..shop.items import sync_asset_shop_item
+                    sync_asset_shop_item(
+                        db=db,
+                        item_type="STICKER",
+                        target_id=existing_sticker.id if existing_sticker else sticker_cfg.id,
+                        original_price=st.get("exchange_price", 20),
+                        sort_order=st.get("sort_order", 0),
+                        is_active=True
+                    )
 
                 imported_count += 1
 
         db.commit()
         return {
             "imported_count": imported_count,
-            "message": f"已成功导入 {imported_count} 条贴纸记录"
+            "imported_series_count": imported_count,
+            "message": f"已成功导入 {imported_count} 个贴纸系列"
         }
     finally:
         # Ensure temporary import cache is always cleaned up

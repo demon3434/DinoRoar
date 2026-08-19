@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  app:
+    image: dinoroar-app:vue3-8081
+    container_name: dinoroar-app-186
+    restart: unless-stopped
+    ports:
+      # 对外暴露端口 8081
+      - "8081:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      - WEB_PORT=8080
+      - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
+      - STT_API_URL=http://stt:18000/api/transcribe
+      - UPLOAD_DIR=/workspace/uploads
+      - DATA_DIR=/workspace/data
+    volumes:
+      - /opt/docker/dinoroar/data:/workspace/data
+      - /opt/docker/dinoroar/uploads:/workspace/uploads
+      - /etc/localtime:/etc/localtime:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - dinoroar_net_186
+
+networks:
+  dinoroar_net_186:
+    name: dinoroar_net_186
+    driver: bridge

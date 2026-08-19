@@ -11,6 +11,7 @@ import shutil
 import re
 import datetime
 import base64
+from typing import Optional, List, Dict
 from pathlib import Path
 from sqlalchemy.orm import Session
 from ...models import CanvasSeries, CanvasSet, CanvasInstance
@@ -121,10 +122,72 @@ def export_canvas_series_zip(db: Session, series_ids: list) -> io.BytesIO:
     return memory_file
 
 
+def clean_stale_temp_imports(max_age_seconds: int = 1800):
+    """
+    清理临时导入目录中超过 30 分钟未处理的陈旧临时文件夹
+    """
+    if not TEMP_IMPORT_DIR.exists():
+        return
+    now = datetime.datetime.now().timestamp()
+    for item in TEMP_IMPORT_DIR.iterdir():
+        if item.is_dir():
+            try:
+                mtime = item.stat().st_mtime
+                if now - mtime > max_age_seconds:
+                    shutil.rmtree(item, ignore_errors=True)
+            except Exception:
+                pass
+
+
+def cancel_import_temp(temp_token: str):
+    """
+    取消画布包导入并立即清理对应的临时解压目录
+    """
+    if not temp_token:
+        return
+    safe_token = os.path.basename(temp_token.strip())
+    target_dir = TEMP_IMPORT_DIR / safe_token
+    if target_dir.exists():
+        shutil.rmtree(target_dir, ignore_errors=True)
+
+
+from PIL import Image
+
+def generate_canvas_thumbnail_b64(img_path: Path, max_width: int = 240) -> str:
+    """
+    为前端卡片网格生成轻量级缩略图 Base64 (240px)，大幅缩减 JSON 大小，避免前端百兆内存阻塞与卡顿
+    """
+    try:
+        with Image.open(img_path) as im:
+            w, h = im.size
+            if w > max_width:
+                new_h = max(1, int(h * (max_width / w)))
+                im = im.resize((max_width, new_h), Image.Resampling.BILINEAR)
+            buf = io.BytesIO()
+            if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                im.save(buf, format="PNG", optimize=True)
+                ext = "png"
+            else:
+                if im.mode != "RGB":
+                    im = im.convert("RGB")
+                im.save(buf, format="JPEG", quality=70, optimize=True)
+                ext = "jpeg"
+            return f"data:image/{ext};base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception:
+        try:
+            with open(img_path, "rb") as imf:
+                ext = img_path.suffix.lstrip(".").lower() or "jpg"
+                return f"data:image/{ext};base64," + base64.b64encode(imf.read()).decode("utf-8")
+        except Exception:
+            return ""
+
+
 def preview_import_canvas_zip(zip_bytes: bytes, db: Session) -> dict:
     """
-    解压并安全校验上传的画布包，解析元数据并准备前端预览数据
+    解压并安全校验上传的画布包，解析元数据并准备前端轻量级预览数据
     """
+    clean_stale_temp_imports()
+
     if len(zip_bytes) > 500 * 1024 * 1024:
         raise ValueError("上传的画布包不能超过 500MB")
 
@@ -184,17 +247,18 @@ def preview_import_canvas_zip(zip_bytes: bytes, db: Session) -> dict:
                     img_file = inst.get("image_file", "")
                     img_path = Path(root) / img_file
                     img_b64 = ""
+                    rel_file_path = ""
                     if img_file and img_path.exists():
+                        img_b64 = generate_canvas_thumbnail_b64(img_path, max_width=240)
                         try:
-                            with open(img_path, "rb") as imf:
-                                ext = img_path.suffix.lstrip(".").lower() or "png"
-                                img_b64 = f"data:image/{ext};base64," + base64.b64encode(imf.read()).decode("utf-8")
+                            rel_file_path = str(img_path.relative_to(target_dir)).replace("\\", "/")
                         except Exception:
-                            pass
+                            rel_file_path = img_file
 
                     instances_preview.append({
                         "aspect_ratio": inst.get("aspect_ratio", "16:9"),
                         "image_b64": img_b64,
+                        "file_path": rel_file_path,
                         "width": inst.get("width", 1440),
                         "height": inst.get("height", 810)
                     })
@@ -244,7 +308,8 @@ def confirm_import_canvases(
     temp_token: str,
     selected_series_names: list,
     conflict_resolution: str,
-    db: Session
+    selected_sets_map: Optional[dict] = None,
+    db: Session = None
 ) -> dict:
     """
     读取解压缓存中的画布包，根据策略将画布及商品套和实例落库，
@@ -260,6 +325,7 @@ def confirm_import_canvases(
         }
 
         imported_series_count = 0
+        imported_sets_count = 0
         copied_files = []
 
         for root, dirs, files in os.walk(target_dir):
@@ -273,6 +339,16 @@ def confirm_import_canvases(
 
                 raw_name = s_data.get("series_name", "未命名系列")
                 if raw_name not in selected_series_names:
+                    continue
+
+                canvas_sets_raw = s_data.get("canvas_sets", [])
+                # 如果传入了按系列指定的套件名单，则按套件名称进行精确过滤
+                if selected_sets_map is not None and raw_name in selected_sets_map:
+                    target_set_names = set(selected_sets_map[raw_name])
+                    canvas_sets_raw = [cs for cs in canvas_sets_raw if cs.get("name") in target_set_names]
+
+                if not canvas_sets_raw:
+                    # 该系列没有需要导入的画布套件，跳过
                     continue
 
                 final_series_name = raw_name
@@ -301,7 +377,6 @@ def confirm_import_canvases(
 
                 dest_dir = get_series_upload_dir(series_id)
 
-                canvas_sets_raw = s_data.get("canvas_sets", [])
                 for cset_raw in canvas_sets_raw:
                     cset_name = cset_raw.get("name", "画布")
                     
@@ -361,6 +436,7 @@ def confirm_import_canvases(
                                 existing_inst.width = inst_raw.get("width", 1440)
                                 existing_inst.height = inst_raw.get("height", 810)
                                 existing_inst.is_deleted = False
+                                db.flush()
                             else:
                                 max_inst_id = db.query(CanvasInstance.id).filter(CanvasInstance.id >= 4001).order_by(CanvasInstance.id.desc()).first()
                                 next_inst_id = 4001 if not max_inst_id else max_inst_id[0] + 1
@@ -374,12 +450,30 @@ def confirm_import_canvases(
                                     is_active=True
                                 )
                                 db.add(new_inst)
+                                db.flush()
+
+                    # 同步写入商城统一商品表
+                    from ..shop.items import sync_asset_shop_item
+                    sync_asset_shop_item(
+                        db=db,
+                        item_type="CANVAS_SET",
+                        target_id=cset_id,
+                        original_price=cset_raw.get("exchange_price", 50),
+                        sort_order=cset_raw.get("sort_order", 0),
+                        is_active=True
+                    )
+
+                    imported_sets_count += 1
 
                 imported_series_count += 1
 
         db.commit()
-        shutil.rmtree(target_dir, ignore_errors=True)
-        return {"imported_series_count": imported_series_count}
+        return {
+            "imported_series_count": imported_series_count,
+            "imported_sets_count": imported_sets_count,
+            "imported_count": imported_series_count,
+            "message": f"已成功导入 {imported_series_count} 个系列（共 {imported_sets_count} 套画布）"
+        }
     except Exception as e:
         db.rollback()
         for f in copied_files:
@@ -388,5 +482,10 @@ def confirm_import_canvases(
                     f.unlink()
             except Exception:
                 pass
-        shutil.rmtree(target_dir, ignore_errors=True)
         raise ValueError(f"正式导入确认落库失败: {str(e)}")
+    finally:
+        try:
+            if target_dir.exists():
+                shutil.rmtree(target_dir, ignore_errors=True)
+        except Exception:
+            pass

@@ -45,20 +45,16 @@ def _detect_local_ip() -> str:
 
 def get_mdns_settings_and_start():
     """
-    Attempts to read mDNS settings from system_settings_manager on startup and starts the mDNS broadcast.
+    Reads mDNS settings from environment or auto-detected local IP on startup and starts the mDNS broadcast.
     """
     try:
-        from ..system_settings_manager import load_system_settings
-        sys_settings = load_system_settings()
-        host = sys_settings.get("host_ip", "").strip()
-        port = sys_settings.get("host_port", settings.service_advertise_port or 8080)
+        host = ""
+        if settings.service_advertise_host and settings.service_advertise_host.strip():
+            host = settings.service_advertise_host.strip()
+        else:
+            host = _detect_local_ip()
 
-        if not host:
-            # Fallback to configured SERVICE_ADVERTISE_HOST in environment
-            if settings.service_advertise_host.strip():
-                host = settings.service_advertise_host.strip()
-            else:
-                host = _detect_local_ip()
+        port = settings.service_advertise_port or getattr(settings, "web_port", 8080) or 8080
 
         if host:
             logger.info(f"Startup: Starting mDNS broadcast for {host}:{port}")

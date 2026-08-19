@@ -156,6 +156,7 @@ def api_admin_update_promotion(
 
 
 @router.patch("/admin/promotions/{promotion_id}/toggle-active", response_model=PromotionResponse)
+@router.post("/admin/promotions/{promotion_id}/toggle-active", response_model=PromotionResponse)
 def api_admin_toggle_promotion_active(
     promotion_id: int,
     payload: PromotionToggleActiveRequest,
