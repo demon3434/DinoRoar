@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build:
@@ -9,19 +7,21 @@ services:
     container_name: dinoroar-app
     restart: unless-stopped
     ports:
-      # Exposes the single HTTP port for Web & API (defaults to 8080)
-      - "${WEB_PORT:-8080}:8080"
+      # 宿主机 HTTP 单端口映射（Web 页面与 API 共用）
+      - "${APP_HTTP_PORT:-8080}:8080"
     environment:
-      - WEB_PORT=${WEB_PORT:-8080}
+      - TZ=${TZ:-Asia/Shanghai}
       - SERVICE_ADVERTISE_HOST=${SERVICE_ADVERTISE_HOST:-}
       - DATABASE_URL=sqlite:////workspace/data/dinoroar.db
       - STT_API_URL=http://stt:18000/api/transcribe
       - UPLOAD_DIR=/workspace/uploads
       - DATA_DIR=/workspace/data
     volumes:
-      # Persists DB in data volume and media uploads in uploads volume
-      - /opt/docker/dinoroar/data:/workspace/data
-      - /opt/docker/dinoroar/uploads:/workspace/uploads
+      # 数据库与上传文件持久化挂载
+      - ${HOST_DATA_DIR:-/opt/docker/dinoroar/data}:/workspace/data
+      - ${HOST_UPLOADS_DIR:-/opt/docker/dinoroar/uploads}:/workspace/uploads
+      # 挂载宿主机时区文件，保证日志与日记时间一致
+      - /etc/localtime:/etc/localtime:ro
     logging:
       driver: "json-file"
       options:
@@ -38,12 +38,13 @@ services:
     image: dinoroar-stt:latest
     container_name: dinoroar-stt
     restart: unless-stopped
-    # ports:
-    #   - "18000:18000"
-
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
     volumes:
-      # Caches ONNX models to avoid redownloading on container recreation
-      - ./stt/models:/app/models
+      # 语音识别 ONNX 模型缓存挂载
+      - ${HOST_STT_MODELS_DIR:-/opt/docker/dinoroar/stt_models}:/app/models
+      # 挂载宿主机时区文件
+      - /etc/localtime:/etc/localtime:ro
     logging:
       driver: "json-file"
       options:
@@ -61,4 +62,5 @@ networks:
     driver: bridge
     driver_opts:
       com.docker.network.bridge.name: br-dinoroar
+
 
