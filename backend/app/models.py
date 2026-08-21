@@ -357,7 +357,7 @@ class CheckInRecord(Base):
     check_in_date = Column(String(10), nullable=False)  # "YYYY-MM-DD"
     energy_reward = Column(Integer, nullable=False)  # 基础随机奖励
     streak_bonus = Column(Integer, nullable=False, default=0)  # 连签加成奖励
-    is_crit = Column(Boolean, nullable=False, default=False)  # 是否触发欧皇暴击
+    is_crit = Column(Boolean, nullable=False, default=False)  # 是否触发暴击
     streak_days = Column(Integer, nullable=False, default=1)  # 截止当日连续签到天数
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
@@ -378,7 +378,7 @@ class CheckInConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     base_min = Column(Integer, nullable=False, default=5)  # 基础日常保底能量
     base_max = Column(Integer, nullable=False, default=15)  # 基础日常最高能量
-    crit_rate = Column(Float, nullable=False, default=0.15)  # 欧皇暴击概率 (15%)
+    crit_rate = Column(Float, nullable=False, default=0.15)  # 暴击概率 (15%)
     crit_min = Column(Integer, nullable=False, default=30)  # 暴击最小能量
     crit_max = Column(Integer, nullable=False, default=66)  # 暴击最大能量
     streak_enabled = Column(Boolean, nullable=False, default=True)  # 连签加成开关

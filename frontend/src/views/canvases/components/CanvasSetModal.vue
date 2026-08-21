@@ -21,11 +21,17 @@ interface CanvasSet {
   instances: CanvasInstance[]
 }
 
-const props = defineProps<{
-  open: boolean
-  seriesId: number
-  set?: CanvasSet | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    seriesId: number
+    set?: CanvasSet | null
+    defaultSortOrder?: number
+  }>(),
+  {
+    defaultSortOrder: 1
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
@@ -35,21 +41,23 @@ const emit = defineEmits<{
 const setName = ref('')
 const setDesc = ref('')
 const setPrice = ref(50)
-const setSortOrder = ref(1)
+const setSortOrder = ref(props.defaultSortOrder || 1)
 
 watch(
-  () => props.set,
-  (val) => {
-    if (val) {
-      setName.value = val.name
-      setDesc.value = val.description || ''
-      setPrice.value = val.exchange_price || 50
-      setSortOrder.value = val.sort_order || 1
-    } else {
-      setName.value = ''
-      setDesc.value = ''
-      setPrice.value = 50
-      setSortOrder.value = 1
+  () => [props.open, props.set] as const,
+  ([isOpen, val]) => {
+    if (isOpen) {
+      if (val) {
+        setName.value = val.name
+        setDesc.value = val.description || ''
+        setPrice.value = val.exchange_price || 50
+        setSortOrder.value = val.sort_order || 1
+      } else {
+        setName.value = ''
+        setDesc.value = ''
+        setPrice.value = 50
+        setSortOrder.value = props.defaultSortOrder ?? 1
+      }
     }
   },
   { immediate: true }
@@ -149,7 +157,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
 
           <div class="form-group" style="margin: 0;">
             <label class="form-label">排序顺序</label>
-            <input v-model="setSortOrder" type="number" class="form-control" value="1" />
+            <input v-model="setSortOrder" type="number" class="form-control" />
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">

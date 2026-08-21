@@ -43,22 +43,23 @@ function parseStreakJson(jsonStr: string) {
 
 function serializeStreakList(): string {
   const obj: Record<string, number> = {}
-  streakList.value.forEach((item) => {
-    if (item.days > 0 && item.reward > 0) {
+  // 按照天数升序整理后序列化
+  const sorted = [...streakList.value].sort((a, b) => (Number(a.days) || 0) - (Number(b.days) || 0))
+  sorted.forEach((item) => {
+    if (Number(item.days) > 0 && Number(item.reward) > 0) {
       obj[String(item.days)] = Number(item.reward)
     }
   })
   return JSON.stringify(obj)
 }
 
-function addStreakRule(days = 1, reward = 5) {
-  const existingDays = new Set(streakList.value.map((s) => s.days))
-  let targetDays = days
-  while (existingDays.has(targetDays)) {
-    targetDays++
-  }
-  streakList.value.push({ days: targetDays, reward })
-  streakList.value.sort((a, b) => a.days - b.days)
+function addStreakRule() {
+  const lastItem = streakList.value.length > 0 ? streakList.value[streakList.value.length - 1] : null
+  const targetDays = lastItem && Number(lastItem.days) > 0 ? Number(lastItem.days) + 1 : (streakList.value.length + 1)
+  const targetReward = lastItem && Number(lastItem.reward) > 0 ? Number(lastItem.reward) + 10 : 5
+
+  // 无条件追加在列表最下方
+  streakList.value.push({ days: targetDays, reward: targetReward })
 }
 
 function removeStreakRule(index: number) {
@@ -66,13 +67,13 @@ function removeStreakRule(index: number) {
 }
 
 function addPresetStreak(days: number, reward: number) {
-  const idx = streakList.value.findIndex((s) => s.days === days)
+  const idx = streakList.value.findIndex((s) => Number(s.days) === Number(days))
   if (idx !== -1) {
     showToast(`连签第 ${days} 天的阶梯规则已存在！`, 'info')
     return
   }
+  // 无条件追加在列表最下方
   streakList.value.push({ days, reward })
-  streakList.value.sort((a, b) => a.days - b.days)
 }
 
 async function fetchConfig() {
@@ -264,10 +265,10 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- 2. 欧皇暴击机制 -->
+          <!-- 2. 暴击机制 -->
           <div class="param-section section-crit">
             <div class="section-title text-crit">
-              <span>🔥</span> 欧皇大暴击机制 (Critical Hit 随机惊喜)
+              <span>🔥</span> 暴击奖励机制 (Critical Hit 随机惊喜)
             </div>
             <div class="form-row-3">
               <div class="form-group">
@@ -410,10 +411,10 @@ onMounted(() => {
 
           <div class="guide-block">
             <div class="guide-item-title text-crit">
-              <span>2️⃣</span> 欧皇大暴击（抽大奖的小惊喜）
+              <span>2️⃣</span> 随机暴击（抽大奖的小惊喜）
             </div>
             <p class="guide-desc">
-              天天拿基础分容易平淡。设置 10%~20%（填 0.1~0.2）的小概率触发暴击，中奖时手机跳出“欧皇暴击! 💥”并奖励大量能量，极具期待感。
+              天天拿基础分容易平淡。设置 10%~20%（填 0.1~0.2）的小概率触发暴击，中奖时手机跳出“触发破壳暴击! 💥”并奖励大量能量，极具期待感。
             </p>
           </div>
 

@@ -74,6 +74,19 @@ const filteredSeries = computed(() => {
   )
 })
 
+const defaultStickerSort = computed(() => {
+  const stickers = currentDetailSeries.value?.stickers || []
+  if (stickers.length === 0) return 1
+  const maxSort = stickers.reduce((max, s) => Math.max(max, Number(s.sort_order) || 0), 0)
+  return maxSort + 1
+})
+
+const defaultSeriesSort = computed(() => {
+  if (seriesList.value.length === 0) return 1
+  const maxSort = seriesList.value.reduce((max, s) => Math.max(max, Number(s.sort_order) || 0), 0)
+  return maxSort + 1
+})
+
 async function loadData() {
   loading.value = true
   try {
@@ -93,6 +106,7 @@ async function loadData() {
 }
 
 function openDetailModal(series: StickerSeries) {
+  if (editingSeriesId.value === series.id) return
   if (isExportMode.value) {
     toggleExportSelect(series.id)
     return
@@ -193,19 +207,35 @@ function startRenameSeries(series: StickerSeries) {
 
 async function handleSaveSeriesRename(newName: string) {
   if (!editingSeriesId.value) return
-  const sId = editingSeriesId.value
-  editingSeriesId.value = null
-  const target = seriesList.value.find((s) => s.id === sId)
-  if (!target || !newName || target.name === newName) return
+  const id = editingSeriesId.value
+  const target = seriesList.value.find((s) => s.id === id)
+  if (!target) {
+    editingSeriesId.value = null
+    return
+  }
+
+  const trimmed = newName.trim()
+  if (!trimmed) {
+    showToast('系列名称不能为空！', 'warning')
+    editingSeriesId.value = null
+    return
+  }
+
+  if (trimmed === target.name) {
+    editingSeriesId.value = null
+    return
+  }
 
   const oldName = target.name
-  target.name = newName
+  target.name = trimmed
   try {
-    await apiClient.put(`/api/stickers/admin/series/${sId}`, { name: newName })
-    showToast(`系列已重命名为「${newName}」`, 'success')
+    await apiClient.put(`/api/stickers/admin/series/${id}`, { name: trimmed })
+    showToast(`系列已重命名为「${trimmed}」`, 'success')
   } catch (err: any) {
     target.name = oldName
     showToast(err.response?.data?.detail || '重命名失败', 'error')
+  } finally {
+    editingSeriesId.value = null
   }
 }
 
@@ -436,9 +466,9 @@ onMounted(() => {
         @click="openDetailModal(series)"
         @toggle-active="handleToggleSeriesActive($event, series)"
         @delete="promptDeleteSeries($event, series)"
-        @start-rename="startRenameSeries(series)"
-        @save-rename="handleSaveSeriesRename"
-        @cancel-rename="handleCancelSeriesRename"
+        @start-rename="startRenameSeries"
+        @submit-rename="handleSaveSeriesRename"
+        @cancel-rename="editingSeriesId = null"
         @toggle-export="toggleExportSelect(series.id)"
         @dragstart="handleSeriesDragStart($event, series)"
         @dragover="handleSeriesDragOver"
@@ -462,6 +492,7 @@ onMounted(() => {
     <!-- 2. 新建系列弹窗 -->
     <StickerAddSeriesModal
       v-model="isAddSeriesModalOpen"
+      :default-sort-order="defaultSeriesSort"
       @confirm="handleCreateSeries"
     />
 
@@ -470,6 +501,7 @@ onMounted(() => {
       v-model:open="isAddStickerModalOpen"
       :series-id="currentDetailSeries?.id || null"
       :series-name="currentDetailSeries?.name"
+      :default-sort-order="defaultStickerSort"
       @created="loadData"
     />
 

@@ -323,6 +323,8 @@ def confirm_import_canvases(
         existing_series_map = {
             s.name: s.id for s in db.query(CanvasSeries).filter(CanvasSeries.is_deleted == False).all()
         }
+        from sqlalchemy import func
+        max_series_sort = db.query(func.max(CanvasSeries.sort_order)).filter(CanvasSeries.is_deleted == False).scalar() or 0
 
         imported_series_count = 0
         imported_sets_count = 0
@@ -366,14 +368,16 @@ def confirm_import_canvases(
                         final_series_name = f"{raw_name}_{idx}"
 
                 if series_id is None:
+                    max_series_sort += 1
                     new_series = CanvasSeries(
                         name=final_series_name,
-                        sort_order=s_data.get("sort_order", 0),
+                        sort_order=max_series_sort,
                         is_active=True
                     )
                     db.add(new_series)
                     db.flush()
                     series_id = new_series.id
+                    existing_series_map[final_series_name] = series_id
 
                 dest_dir = get_series_upload_dir(series_id)
 

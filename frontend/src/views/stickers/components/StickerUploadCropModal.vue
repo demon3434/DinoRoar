@@ -5,11 +5,17 @@ import 'cropperjs/dist/cropper.css'
 import apiClient from '@/api/client'
 import { showToast } from '@/utils/toast'
 
-const props = defineProps<{
-  open: boolean
-  seriesId: number | null
-  seriesName?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    seriesId: number | null
+    seriesName?: string
+    defaultSortOrder?: number
+  }>(),
+  {
+    defaultSortOrder: 1
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
@@ -18,11 +24,21 @@ const emit = defineEmits<{
 
 const newStickerName = ref('')
 const newStickerPrice = ref(10)
-const newStickerSort = ref(1)
+const newStickerSort = ref(props.defaultSortOrder || 1)
 const stickerImageRef = ref<HTMLImageElement | null>(null)
 const stickerCropPlaceholder = ref(true)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 let cropperInstance: Cropper | null = null
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      newStickerSort.value = props.defaultSortOrder ?? 1
+    }
+  },
+  { immediate: true }
+)
 
 let mouseDownOnBackdrop = false
 
@@ -40,7 +56,7 @@ function onBackdropClick(e: MouseEvent) {
 function handleClose() {
   newStickerName.value = ''
   newStickerPrice.value = 10
-  newStickerSort.value = 1
+  newStickerSort.value = props.defaultSortOrder ?? 1
   stickerCropPlaceholder.value = true
   if (cropperInstance) {
     cropperInstance.destroy()

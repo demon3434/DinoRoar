@@ -273,7 +273,9 @@ def confirm_import_stickers(
         existing_series_map = {
             s.name: s.id for s in db.query(StickerSeries).filter(StickerSeries.is_deleted == False).all()
         }
-        logger.info(f"confirm_import_stickers: existing_series_map={existing_series_map}")
+        from sqlalchemy import func
+        max_series_sort = db.query(func.max(StickerSeries.sort_order)).filter(StickerSeries.is_deleted == False).scalar() or 0
+        logger.info(f"confirm_import_stickers: existing_series_map={existing_series_map}, current max_series_sort={max_series_sort}")
 
         imported_count = 0
 
@@ -311,14 +313,16 @@ def confirm_import_stickers(
                         logger.info(f"confirm_import_stickers: raw_name='{raw_name}' exists and conflict_resolution='rename', renaming to '{final_series_name}'")
 
                 if series_id is None:
+                    max_series_sort += 1
                     new_series = StickerSeries(
                         name=final_series_name,
-                        sort_order=s_data.get("sort_order", 0),
+                        sort_order=max_series_sort,
                         is_active=True
                     )
                     db.add(new_series)
                     db.flush()
                     series_id = new_series.id
+                    existing_series_map[final_series_name] = series_id
 
                 dest_dir = get_series_upload_dir(series_id)
 

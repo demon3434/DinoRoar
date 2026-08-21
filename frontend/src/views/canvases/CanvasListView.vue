@@ -94,6 +94,19 @@ const filteredSeries = computed(() => {
   )
 })
 
+const defaultCanvasSort = computed(() => {
+  const sets = currentDetailSeries.value?.sets || []
+  if (sets.length === 0) return 1
+  const maxSort = sets.reduce((max, s) => Math.max(max, Number(s.sort_order) || 0), 0)
+  return maxSort + 1
+})
+
+const defaultSeriesSort = computed(() => {
+  if (seriesList.value.length === 0) return 1
+  const maxSort = seriesList.value.reduce((max, s) => Math.max(max, Number(s.sort_order) || 0), 0)
+  return maxSort + 1
+})
+
 async function loadData() {
   loading.value = true
   try {
@@ -521,6 +534,7 @@ onMounted(() => {
     <!-- 2. 新建系列弹窗 -->
     <CanvasSeriesModal
       v-model:open="isAddSeriesModalOpen"
+      :default-sort-order="defaultSeriesSort"
       @created="loadData"
     />
 
@@ -529,6 +543,7 @@ onMounted(() => {
       v-model:open="isSetModalOpen"
       :series-id="currentDetailSeries?.id || 0"
       :set="editingSet"
+      :default-sort-order="defaultCanvasSort"
       @saved="loadData"
     />
 

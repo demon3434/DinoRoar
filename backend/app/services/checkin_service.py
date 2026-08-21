@@ -207,7 +207,7 @@ class CheckInService:
         db.commit()
         db.refresh(checkin_record)
 
-        msg = "💥 欧皇降临！触发大暴击！" if is_crit else "🎉 敲蛋成功！"
+        msg = "💥 触发暴击！" if is_crit else "🎉 敲蛋成功！"
         if streak_bonus > 0:
             msg += f" 连续签到第 {streak_days} 天，额外获赠 {streak_bonus} 蛋能量！"
 

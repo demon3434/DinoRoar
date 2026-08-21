@@ -184,7 +184,7 @@ class EnergyEngineService:
             direction = "EARN"
             checkin = db.query(models.CheckInRecord).filter(models.CheckInRecord.id == tx.target_id).first()
             if checkin:
-                crit_text = " (欧皇暴击! 💥)" if checkin.is_crit else ""
+                crit_text = " (暴击! 💥)" if checkin.is_crit else ""
                 subtitle = f"✨ 连续签到第 {checkin.streak_days} 天{crit_text} · 获得 {checkin.energy_reward} 能量"
                 badge_label = "每日签到"
                 image_url = None

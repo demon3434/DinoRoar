@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 
-const props = defineProps<{
-  modelValue: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    defaultSortOrder?: number
+  }>(),
+  {
+    defaultSortOrder: 1
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
@@ -11,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const name = ref('')
-const sortOrder = ref(1)
+const sortOrder = ref(props.defaultSortOrder || 1)
 
 let mouseDownOnBackdrop = false
 
@@ -35,7 +41,7 @@ watch(
   (val) => {
     if (val) {
       name.value = ''
-      sortOrder.value = 1
+      sortOrder.value = props.defaultSortOrder ?? 1
     }
   }
 )
@@ -82,7 +88,7 @@ onUnmounted(() => {
           </div>
           <div class="form-group" style="margin: 0;">
             <label class="form-label">排序顺序</label>
-            <input v-model="sortOrder" type="number" class="form-control" value="1" />
+            <input v-model="sortOrder" type="number" class="form-control" />
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
             <button type="button" class="btn btn-secondary" @click="handleClose">取消</button>

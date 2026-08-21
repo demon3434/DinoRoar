@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import apiClient from '@/api/client'
 import { showToast } from '@/utils/toast'
 
-const props = defineProps<{
-  open: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    defaultSortOrder?: number
+  }>(),
+  {
+    defaultSortOrder: 1
+  }
+)
 
 const emit = defineEmits<{
   (e: 'update:open', val: boolean): void
@@ -13,7 +19,17 @@ const emit = defineEmits<{
 }>()
 
 const newSeriesName = ref('')
-const newSeriesSort = ref(1)
+const newSeriesSort = ref(props.defaultSortOrder || 1)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen) {
+      newSeriesName.value = ''
+      newSeriesSort.value = props.defaultSortOrder ?? 1
+    }
+  }
+)
 
 let mouseDownOnBackdrop = false
 
@@ -30,7 +46,7 @@ function onBackdropClick(e: MouseEvent) {
 
 function handleClose() {
   newSeriesName.value = ''
-  newSeriesSort.value = 1
+  newSeriesSort.value = props.defaultSortOrder ?? 1
   emit('update:open', false)
 }
 
@@ -83,7 +99,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
           </div>
           <div class="form-group" style="margin: 0;">
             <label class="form-label">排序顺序</label>
-            <input v-model="newSeriesSort" type="number" class="form-control" value="1" />
+            <input v-model="newSeriesSort" type="number" class="form-control" />
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
             <button type="button" class="btn btn-secondary" @click="handleClose">取消</button>
