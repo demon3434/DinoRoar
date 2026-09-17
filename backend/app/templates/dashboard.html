@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 秘密基地看板{% endblock %}
+
+{% block content %}
+<!-- 节日特惠活动横幅 (有活动时动态呈现) -->
+<div id="dashboardPromoBanner" style="display: none; margin-bottom: 20px; padding: 14px 20px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(245, 158, 11, 0.12)); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 1.6rem;">🎉</span>
+        <div>
+            <div id="dashboardPromoTitle" style="font-weight: 800; font-size: 0.98rem; color: #6d28d9;">节日特惠大促进行中！</div>
+            <div id="dashboardPromoDesc" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">快去商城挑选心仪的贴纸和画布吧～</div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <a href="/stickers" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6); color: white; text-decoration: none; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3);">🎨 贴纸特惠</a>
+        <a href="/canvases" style="background: linear-gradient(135deg, #60a5fa, #3b82f6); color: white; text-decoration: none; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">🖼️ 画布特惠</a>
+    </div>
+</div>
+
+<!-- 主看板 CSS Grid 2x2 跨行对齐网格 -->
+<div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 25px; margin-bottom: 25px;">
+    
+    <!-- 1. 板块 1: 🥚 蛋能量 (左上第1行，与时光机等宽) -->
+    <div class="card" style="grid-column: 1; grid-row: 1; padding: 22px; border: 1px solid var(--card-border); border-radius: 20px; position: relative;">
+
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 14px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                    <span>🥚 蛋能量</span>
+                </div>
+                <div onclick="openEnergyLedgerModal()" style="font-size: 0.95rem; font-weight: 800; color: #22c55e; font-family: monospace; background: rgba(34,197,94,0.12); padding: 4px 10px; border-radius: 10px; border: 1px solid rgba(34,197,94,0.25); cursor: pointer; transition: all 0.2s;" title="点击查看蛋能量流水明细">
+                    余额：<span id="eggEnergyBalance">0</span> ⚡
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button onclick="openEnergyLedgerModal()" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #3b82f6; padding: 5px 12px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; font-family: monospace; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px;" title="查看蛋能量流水账本">
+                    <span>📜</span> 明细
+                </button>
+                <button onclick="showEggEnergyHelp()" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-muted); border-radius: 50%; width: 30px; height: 30px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;" title="帮助说明">❓</button>
+                <a href="/mall" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); text-decoration: none; padding: 5px 12px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; font-family: monospace; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); transition: transform 0.2s;">🛍️ 商店</a>
+            </div>
+        </div>
+
+
+        <!-- 蛋能量增量记录 2x2 网格 -->
+        <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); font-family: monospace; margin-bottom: 10px;">📈 增量记录：</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">今日</span>
+                <span id="deltaToday" style="font-size: 0.85rem; font-weight: bold; color: #3b82f6; font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">本周</span>
+                <span id="deltaThisWeek" style="font-size: 0.85rem; font-weight: bold; color: #f59e0b; font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">上周</span>
+                <span id="deltaLastWeek" style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted); font-family: monospace;">+0 ⚡</span>
+            </div>
+            <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">本月</span>
+                <span id="deltaThisMonth" style="font-size: 0.85rem; font-weight: bold; color: #22c55e; font-family: monospace;">+0 ⚡</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 板块 2: 📊 时光机 (左下第2行，与蛋能量等宽) -->
+    <div class="card" style="grid-column: 1; grid-row: 2; padding: 22px; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; border-radius: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                <span>📊 时光机</span>
+            </div>
+            <!-- Toggle Tabs -->
+            <div style="display: flex; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 3px; gap: 3px;">
+                <button onclick="switchPeriodTab('week')" id="pTab-week" class="period-tab-btn active-tab" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本周</button>
+                <button onclick="switchPeriodTab('month')" id="pTab-month" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本月</button>
+                <button onclick="switchPeriodTab('last_month')" id="pTab-last_month" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">上月</button>
+                <button onclick="switchPeriodTab('year')" id="pTab-year" class="period-tab-btn" style="background: transparent; color: var(--text-muted); border: none; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; transition: all 0.2s;">本年</button>
+            </div>
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;" id="periodDateRange">
+            📅 周期范围: ----.--.-- - ----.--.--
+        </div>
+
+        <!-- 篇数及增减统计 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); border: 1px solid var(--card-border); padding: 12px 16px; border-radius: 14px;">
+            <span style="font-weight: 800; font-size: 0.85rem; color: var(--text-main); font-family: monospace;">📝 新增悄悄话</span>
+            <div style="display: flex; align-items: center; gap: 8px; font-family: monospace;">
+                <span id="periodLogCount" style="font-size: 1.15rem; font-weight: 800; color: #22c55e;">0 篇</span>
+                <span id="periodLogDiff" style="font-size: 0.75rem; color: var(--text-muted);">(持平)</span>
+            </div>
+        </div>
+
+        <!-- 情绪分布比例进度条 -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); font-family: monospace;">🎨 情绪占比晴雨表</div>
+            <div style="width: 100%; height: 16px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--card-border); overflow: hidden; display: flex;" id="periodMoodProgress">
+                <div id="moodBarHigh" style="width: 0%; background: #22c55e; height: 100%; transition: width 0.3s;" title="开心"></div>
+                <div id="moodBarMid" style="width: 0%; background: #3b82f6; height: 100%; transition: width 0.3s;" title="平静"></div>
+                <div id="moodBarLow" style="width: 0%; background: #ef4444; height: 100%; transition: width 0.3s;" title="难过"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-family: monospace; margin-top: 2px;">
+                <span>🟢 开心 <strong id="pctHigh">0%</strong></span>
+                <span>🔵 平静 <strong id="pctMid">0%</strong></span>
+                <span>🔴 难过 <strong id="pctLow">0%</strong></span>
+            </div>
+        </div>
+
+        <!-- 最常提及的小伙伴 Top 3 -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); font-family: monospace;">👥 提到最多的小伙伴</div>
+            <div id="periodTopPersonsContainer" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; min-height: 80px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 板块 3: 👥 日记中的 ta (右侧第2列，跨越第1到第2行：1 / span 2，顶部绝对平齐蛋能量，底部绝对平齐时光机) -->
+    <div class="card" style="grid-column: 2; grid-row: 1 / span 2; padding: 22px; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; border-radius: 20px; height: 100%; box-sizing: border-box;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-main); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                <span>👥 日记中的 ta</span>
+            </div>
+        </div>
+
+        <!-- 分类 Tab 页签滑动/切换栏 -->
+        <div id="categoryTabsContainer" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin;">
+        </div>
+
+        <!-- 选中分类下的关系人列表卡片容器 -->
+        <div id="categoryPersonsContainer" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: hidden; padding-right: 6px; scrollbar-width: thin;">
+        </div>
+    </div>
+
+</div>
+
+<!-- 蛋能量说明书 Modal -->
+<div id="eggEnergyHelpModal" class="modal" onclick="if(event.target === this) this.style.display='none';" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:9999; backdrop-filter:blur(5px);">
+    <div style="background: var(--bg-card, var(--card-bg, #1e293b)); border: 1px solid var(--card-border); border-radius: 20px; width: 90%; max-width: 440px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); font-family: monospace; color: var(--text-main);">
+        <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <span>🥚 蛋能量说明书</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.7; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+                <strong style="color: #f59e0b;">⭐ 什么是蛋能量？</strong><br>
+                蛋能量是小朋友记录日记赚取的神奇积分奖励哦！
+            </div>
+            <div>
+                <strong style="color: #22c55e;">⭐ 怎么获得蛋能量？</strong><br>
+                • ✍️ 记一篇纯文字悄悄话，获得 <strong>10 蛋能量</strong><br>
+                • 🖼️ 记一篇包含图片/视频/录音的悄悄话，获得 <strong>30 蛋能量！</strong>
+            </div>
+            <div>
+                <strong style="color: #3b82f6;">⭐ 怎么使用蛋能量？</strong><br>
+                • 🛍️ 点击顶部的“商店”按钮，进入手账商城挑选并兑换精美的恐龙贴纸与背景画布<br>
+                • 🎨 兑换后的贴纸可直接用于日记排版哦！
+            </div>
+        </div>
+        <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+            <button onclick="document.getElementById('eggEnergyHelpModal').style.display='none';" style="background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111); border: none; padding: 8px 20px; border-radius: 10px; font-weight: bold; cursor: pointer;">我知道啦</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🏦 银行级蛋能量流水账本 Modal (固定高度，防止切换跳变) -->
+<div id="energyLedgerModal" class="modal" onclick="if(event.target === this) closeEnergyLedgerModal();" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; z-index:9999; backdrop-filter:blur(6px);">
+    <div style="background: var(--bg-main, #fefaf6); background-color: var(--card-bg, #ffffff); border: 1px solid var(--card-border); border-radius: 20px; width: 94%; max-width: 620px; height: 680px; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 45px rgba(0,0,0,0.25); font-family: monospace; color: var(--text-main);">
+        <!-- 弹窗 Header (紧凑小巧) -->
+        <div style="padding: 14px 20px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2rem;">🥚</span>
+                <span style="font-weight: 800; font-size: 1.02rem; color: var(--text-main);">蛋能量流水明细</span>
+                <span style="font-size: 0.78rem; font-weight: 800; color: var(--dino-green, #16a34a); background: var(--reflection-bg, rgba(34,197,94,0.12)); padding: 2px 8px; border-radius: 8px; border: 1px solid var(--card-border);">
+                    当前余额: <span id="ledgerBalance">0</span> ⚡
+                </span>
+            </div>
+            <button onclick="closeEnergyLedgerModal()" style="background: transparent; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 6px;">✕</button>
+        </div>
+
+        <!-- 5列立体带边框可点击筛选卡片 (今日 / 本周 / 本月 / 上月 / 本年) -->
+        <div style="margin: 10px 18px 8px 18px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; font-size: 0.70rem; text-align: center; flex-shrink: 0;">
+            <div id="cardTimeToday" onclick="switchTimeRange('today')" class="time-filter-card" style="cursor: pointer; padding: 6px 2px; border-radius: 9px; transition: all 0.2s; border: 1px solid var(--card-border); background: var(--card-bg);" title="点击只看今日流水">
+                <span style="color: var(--text-muted); font-weight: 600;">今日</span><br>
+                <span id="ledgerToday" style="font-weight: 800; color: var(--dino-green, #16a34a);">+0</span>
+                <span style="color: var(--text-muted); font-size: 0.62rem;"> / </span>
+                <span id="ledgerTodayExp" style="font-weight: 800; color: var(--dino-orange, #ea580c);">-0</span>
+            </div>
+            <div id="cardTimeWeek" onclick="switchTimeRange('week')" class="time-filter-card" style="cursor: pointer; padding: 6px 2px; border-radius: 9px; transition: all 0.2s; border: 1px solid var(--card-border); background: var(--card-bg);" title="点击只看本周流水">
+                <span style="color: var(--text-muted); font-weight: 600;">本周</span><br>
+                <span id="ledgerWeekInc" style="font-weight: 800; color: var(--dino-green, #16a34a);">+0</span>
+                <span style="color: var(--text-muted); font-size: 0.62rem;"> / </span>
+                <span id="ledgerWeekExp" style="font-weight: 800; color: var(--dino-orange, #ea580c);">-0</span>
+            </div>
+            <div id="cardTimeMonth" onclick="switchTimeRange('month')" class="time-filter-card" style="cursor: pointer; padding: 6px 2px; border-radius: 9px; transition: all 0.2s; border: 1px solid var(--card-border); background: var(--card-bg);" title="点击只看本月流水">
+                <span style="color: var(--text-muted); font-weight: 600;">本月</span><br>
+                <span id="ledgerMonthIncome" style="font-weight: 800; color: var(--dino-green, #16a34a);">+0</span>
+                <span style="color: var(--text-muted); font-size: 0.62rem;"> / </span>
+                <span id="ledgerMonthExpense" style="font-weight: 800; color: var(--dino-orange, #ea580c);">-0</span>
+            </div>
+            <div id="cardTimeLastMonth" onclick="switchTimeRange('last_month')" class="time-filter-card" style="cursor: pointer; padding: 6px 2px; border-radius: 9px; transition: all 0.2s; border: 1px solid var(--card-border); background: var(--card-bg);" title="点击只看上月流水">
+                <span style="color: var(--text-muted); font-weight: 600;">上月</span><br>
+                <span id="ledgerLastMonthIncome" style="font-weight: 800; color: var(--dino-green, #16a34a);">+0</span>
+                <span style="color: var(--text-muted); font-size: 0.62rem;"> / </span>
+                <span id="ledgerLastMonthExpense" style="font-weight: 800; color: var(--dino-orange, #ea580c);">-0</span>
+            </div>
+            <div id="cardTimeYear" onclick="switchTimeRange('year')" class="time-filter-card" style="cursor: pointer; padding: 6px 2px; border-radius: 9px; transition: all 0.2s; border: 1px solid var(--card-border); background: var(--card-bg);" title="点击只看本年流水">
+                <span style="color: var(--text-muted); font-weight: 600;">本年</span><br>
+                <span id="ledgerYearIncome" style="font-weight: 800; color: var(--dino-green, #16a34a);">+0</span>
+                <span style="color: var(--text-muted); font-size: 0.62rem;"> / </span>
+                <span id="ledgerYearExpense" style="font-weight: 800; color: var(--dino-orange, #ea580c);">-0</span>
+            </div>
+        </div>
+
+        <!-- 筛选栏 (全部 / 📈 获得 / 📉 消耗) -->
+        <div style="padding: 0 18px 8px 18px; display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+            <button onclick="switchLedgerFilter('all')" id="btnFilterAll" class="ledger-filter-btn active" style="padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; border: 1px solid var(--accent-sunny, #f59e0b); background: var(--accent-sunny, #f59e0b); color: var(--bg-main, #111);">全部</button>
+            <button onclick="switchLedgerFilter('income')" id="btnFilterIncome" class="ledger-filter-btn" style="padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-muted);">📈 获得</button>
+            <button onclick="switchLedgerFilter('expense')" id="btnFilterExpense" class="ledger-filter-btn" style="padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-muted);">📉 消耗</button>
+            <button onclick="resetTimeAndFilter()" id="btnResetTimeRange" style="display:none; padding: 4px 8px; border-radius: 8px; font-size: 0.72rem; cursor: pointer; border: 1px dashed var(--accent-sunny, #f59e0b); background: rgba(245,158,11,0.1); color: var(--accent-sunny, #f59e0b);" title="清除时间段筛选">✖ 清除时间筛选</button>
+            <button onclick="loadEnergyLedger()" style="margin-left: auto; background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-muted); padding: 4px 10px; border-radius: 8px; font-size: 0.72rem; cursor: pointer;" title="刷新流水">🔄 刷新</button>
+        </div>
+
+        <!-- 流水列表容器 (固定视口弹性滚动) -->
+        <div id="ledgerListContainer" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0 18px 8px 18px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 0.82rem;">
+                加载流水记录中...
+            </div>
+        </div>
+
+        <!-- 常驻经典后端分页控制条 (支持下拉切换每页条数，智能禁用与半透明置灰) -->
+        <div id="ledgerPaginationBar" style="padding: 10px 18px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); font-size: 0.75rem; flex-shrink: 0;">
+            <button id="btnLedgerPrevPage" onclick="changeLedgerPage(-1)" style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-weight: bold; cursor: pointer; transition: all 0.2s;" disabled>◀ 上一页</button>
+            
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="ledgerPageInfo" style="color: var(--text-muted); font-size: 0.72rem;">第 1 / 1 页 (共 0 笔)</span>
+                <select id="ledgerPageSizeSelect" onchange="changeLedgerPageSize(this.value)" style="padding: 2px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-size: 0.72rem; cursor: pointer; font-family: monospace;">
+                    <option value="10">10 条/页</option>
+                    <option value="20" selected>20 条/页</option>
+                    <option value="50">50 条/页</option>
+                </select>
+            </div>
+
+            <button id="btnLedgerNextPage" onclick="changeLedgerPage(1)" style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-weight: bold; cursor: pointer; transition: all 0.2s;" disabled>下一页 ▶</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🧾 拟物电子回单 Modal -->
+<div id="energyReceiptModal" class="modal" onclick="if(event.target === this) closeEnergyReceipt();" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:10000; backdrop-filter:blur(6px);">
+    <div style="background: var(--bg-main, #fefaf6); background-color: var(--card-bg, #ffffff); border: 1px dashed var(--card-border); border-radius: 20px; width: 90%; max-width: 420px; padding: 22px; box-shadow: 0 20px 45px rgba(0,0,0,0.25); font-family: monospace; color: var(--text-main); position: relative; overflow: hidden;">
+        <!-- 暗纹防伪水印 -->
+        <div style="position: absolute; top: 35%; left: 6%; font-size: 2.2rem; font-weight: 900; color: var(--text-muted); opacity: 0.06; transform: rotate(-30deg); pointer-events: none;">DINOROAR VERIFIED</div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-muted);">🧾 蛋能量电子凭证</span>
+            <button onclick="closeEnergyReceipt()" style="background: transparent; border: none; font-size: 1.1rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        </div>
+
+        <div style="text-align: center; margin: 8px 0 14px 0;">
+            <div style="font-size: 0.75rem; color: var(--dino-green, #16a34a); font-weight: 700;">交易成功 · 权威已记账</div>
+            <div id="receiptAmount" style="font-size: 2.1rem; font-weight: 900; margin: 4px 0;">+10</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">蛋能量变动</div>
+        </div>
+
+        <div style="border-top: 1px dashed var(--card-border); padding-top: 12px; display: flex; flex-direction: column; gap: 7px; font-size: 0.78rem;">
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">业务摘要：</span>
+                <span id="receiptTitle" style="font-weight: 700; color: var(--text-main); text-align: right; max-width: 65%;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">所属系列/类型：</span>
+                <span id="receiptBadge" style="font-weight: 700;">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">交易时间：</span>
+                <span id="receiptTime" style="color: var(--text-main);">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">变动前余额：</span>
+                <span id="receiptPrevBalance" style="color: var(--text-main);">--</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">变动后结余：</span>
+                <span id="receiptAfterBalance" style="color: var(--dino-green, #16a34a); font-weight: 800;">--</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; border-top: 1px dashed var(--card-border); padding-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: var(--text-muted);">流水单号：</span>
+                    <button onclick="copyCurrentReceiptUuid()" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--accent-cloudy, #2563eb); font-size: 0.7rem; padding: 2px 8px; border-radius: 6px; cursor: pointer;">复制</button>
+                </div>
+                <div id="receiptUuid" style="font-size: 0.72rem; color: var(--text-muted); word-break: break-all; line-height: 1.3; background: var(--card-bg); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--card-border);">--</div>
+            </div>
+        </div>
+
+        <!-- 关联实体图片预览卡片 -->
+        <div id="receiptAssetBox" style="display: none; margin-top: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 8px 12px; align-items: center; gap: 10px;">
+            <img id="receiptAssetImg" src="" style="width: 44px; height: 44px; border-radius: 8px; object-fit: contain; background: rgba(0,0,0,0.04); border: 1px solid var(--card-border);" />
+            <div style="flex: 1; overflow: hidden;">
+                <div id="receiptAssetName" style="font-weight: 700; font-size: 0.8rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">--</div>
+                <div id="receiptAssetDesc" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">关联实体档案</div>
+            </div>
+        </div>
+
+        <!-- 底部动作按钮 -->
+        <div style="margin-top: 16px; display: flex; gap: 8px;">
+            <button id="btnReceiptAction" onclick="handleReceiptAction()" style="display: none; flex: 1; background: var(--accent-cloudy, #2563eb); color: white; border: none; padding: 8px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">📖 查看对应手账</button>
+            <button onclick="closeEnergyReceipt()" style="flex: 1; background: var(--dino-green, #16a34a); color: white; border: none; padding: 8px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">确定</button>
+        </div>
+
+        <div style="margin-top: 12px; text-align: center; font-size: 0.65rem; color: var(--text-muted);">
+            🦖 DINOROAR 秘密基地能量银行系统 · 电子验讫
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/overview.js?v=202608190950"></script>
+{% endblock %}
+
+
+
+

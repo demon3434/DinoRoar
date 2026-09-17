@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 日记详情{% endblock %}
+
+{% block content %}
+<div class="card" style="padding: 25px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+        <button class="logout-btn" onclick="goBackToSearch()" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); height: 36px; padding: 0 16px; border-radius: 10px; display: flex; align-items: center; gap: 8px; color: var(--text-main); cursor: pointer;">
+            <span>⬅️</span> <span>返回日记列表</span>
+        </button>
+        <h3 id="detailLogTitleHeader" style="font-size: 1.25rem; font-weight: 700; color: var(--text-main); margin: 0;">日记详情</h3>
+        <div style="width: 120px;"></div> <!-- Spacer to keep header centered -->
+    </div>
+    
+    <div id="detailLogContentBody" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Populated dynamically by JS -->
+        <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+            正在加载日记详情...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/diary_detail.js?v=202607142306"></script>
+{% endblock %}

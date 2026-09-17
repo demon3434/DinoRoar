@@ -1,11 +1,16 @@
 from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 router = APIRouter(tags=["Web Pages"])
 
-# Setup SPA dist file path
+# Setup Jinja2 templates directory
 app_dir = Path(__file__).resolve().parent.parent
+templates_dir = app_dir / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
+
+# Setup SPA dist file path
 spa_index_file = app_dir / "static" / "dist" / "index.html"
 
 NO_CACHE_HEADERS = {
@@ -31,11 +36,13 @@ def _serve_spa():
         status_code=503
     )
 
+# 1. 统一登录入口 (SPA 现代酷炫登录页)
 @router.get("/login")
 async def get_login_page(request: Request):
     """登录单页入口"""
     return _serve_spa()
 
+# 2. 管理员控制台入口 (SPA 接管)
 @router.get("/admin")
 async def get_admin_page(request: Request):
     """管理控制台主页入口"""
@@ -46,7 +53,48 @@ async def get_admin_subpaths(request: Request, subpath: str):
     """管理控制台所有子路由入口（stickers, canvases, promotions, checkin, energy/ledger 等）"""
     return _serve_spa()
 
+# 3. 面向普通用户（孩子端账号）的专属前台主页与完整功能
+@router.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard_page(request: Request):
+    """孩子端主控台看板"""
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"active_tab": "dashboard"})
+
+@router.get("/diary", response_class=HTMLResponse)
+async def get_diary_page(request: Request):
+    """孩子日记时间轴列表"""
+    return templates.TemplateResponse(request=request, name="diary.html", context={"active_tab": "diary"})
+
+@router.get("/diary/detail", response_class=HTMLResponse)
+async def get_diary_detail_page(request: Request):
+    """孩子日记详情与全屏信纸大图预览"""
+    return templates.TemplateResponse(request=request, name="diary_detail.html", context={"active_tab": "diary"})
+
+@router.get("/stickers", response_class=HTMLResponse)
+async def get_stickers_page(request: Request):
+    """孩子贴纸背包与收集图鉴"""
+    return templates.TemplateResponse(request=request, name="stickers.html", context={"active_tab": "mall"})
+
+@router.get("/canvases", response_class=HTMLResponse)
+async def get_canvases_page(request: Request):
+    """孩子画布展馆"""
+    return templates.TemplateResponse(request=request, name="canvases.html", context={"active_tab": "mall"})
+
+@router.get("/mall", response_class=HTMLResponse)
+async def get_mall_page(request: Request):
+    """蛋能量商城与兑换"""
+    return templates.TemplateResponse(request=request, name="mall.html", context={"active_tab": "mall"})
+
+@router.get("/settings/persons", response_class=HTMLResponse)
+async def get_settings_persons_page(request: Request):
+    """孩子亲友羁绊卡片"""
+    return templates.TemplateResponse(request=request, name="settings_persons.html", context={"active_tab": "settings-persons"})
+
+@router.get("/settings/personal", response_class=HTMLResponse)
+async def get_settings_personal_page(request: Request):
+    """孩子个人偏好与恐龙九宫格设置"""
+    return templates.TemplateResponse(request=request, name="settings_personal.html", context={"active_tab": "settings-personal"})
+
 @router.get("/")
 async def get_root_page(request: Request):
-    """根路径入口（由前端 Vue Router 自动重定向至 /admin/stickers）"""
+    """根路径入口"""
     return _serve_spa()

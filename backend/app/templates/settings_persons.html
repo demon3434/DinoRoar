@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}小恐龙 DinoRoar - 关系人管理{% endblock %}
+
+{% block content %}
+<div class="card" style="padding: 25px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                👥 关系人分组与看板管理
+            </h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">📂 提示：支持横向拖拽分类列头进行“分类排序”；纵向拖拽人员卡片进行“人物排序”或“跨组移动分类”；临时路人拖拽至其他分组即可“快捷转正”。点击卡片可进行属性编辑与删除。</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="openAddCategoryModal()" class="btn-primary-purple" style="padding: 8px 16px; border-radius: 10px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: bold;">新建分类</button>
+            <button onclick="openAddPersonModal()" class="btn-primary-green" style="padding: 8px 16px; border-radius: 10px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: bold;">添加人物</button>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div id="kanbanBoard" class="kanban-board">
+        <!-- Populated dynamically -->
+        <div style="text-align: center; color: var(--text-muted); padding: 30px; width: 100%;">
+            正在加载看板数据...
+        </div>
+    </div>
+</div>
+
+<!-- Category Add/Edit Modal -->
+<div id="categoryModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;">
+    <div class="card" style="width: 400px; padding: 25px;">
+        <h3 id="categoryModalTitle" style="margin-bottom: 20px; font-size: 1.15rem; color: var(--accent-sunny); font-weight: 800;">新建分类</h3>
+        <input type="hidden" id="categoryModalUuid">
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+            <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">分类名称:</label>
+            <input id="categoryModalName" class="modal-input" placeholder="例如: 家人, 同桌">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button onclick="closeCategoryModal()" class="logout-btn" style="height: 38px; cursor: pointer;">取消</button>
+            <button onclick="saveCategoryModal()" class="modal-btn-save" style="height: 38px; cursor: pointer;">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- Person Edit/Add Modal -->
+<div id="personModal" class="modal" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;">
+    <div class="card" style="width: 450px; padding: 25px;">
+        <h3 id="personModalTitle" style="margin-bottom: 20px; font-size: 1.15rem; color: var(--accent-sunny); font-weight: 800;">添加人物关系</h3>
+        <input type="hidden" id="personModalUuid">
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">人物姓名:</label>
+                <input id="personModalName" class="modal-input" placeholder="姓名">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">拼音缩写:</label>
+                <input id="personModalAbbr" class="modal-input" placeholder="缩写 (拼音)">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">角色关系:</label>
+                <input id="personModalRel" class="modal-input" placeholder="关系 (例如: 爸爸, 老师)">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">所属分类:</label>
+                <select id="personModalCategory" class="modal-input">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">高亮标签色:</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="red" checked> <span class="dino-color-dot dot-red"></span> 红</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="orange"> <span class="dino-color-dot dot-orange"></span> 橙</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="yellow"> <span class="dino-color-dot dot-yellow"></span> 黄</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="green"> <span class="dino-color-dot dot-green"></span> 绿</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="blue"> <span class="dino-color-dot dot-blue"></span> 蓝</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="purple"> <span class="dino-color-dot dot-purple"></span> 紫</label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; cursor:pointer;"><input type="radio" name="personModalColor" value="gray"> <span class="dino-color-dot dot-gray"></span> 灰</label>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; align-items: center;">
+            <button id="personModalDeleteBtn" onclick="deletePersonFromModal()" class="modal-btn-delete" style="display: none; margin-right: auto; cursor: pointer;">停用人物</button>
+            <button onclick="closePersonModal()" class="logout-btn" style="height: 38px; cursor: pointer;">取消</button>
+            <button onclick="savePersonModal()" class="modal-btn-save" style="height: 38px; cursor: pointer;">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/persons-drag-drop.js"></script>
+<script src="/static/js/persons-modals.js"></script>
+<script src="/static/js/persons-board.js?v=202607142306"></script>
+{% endblock %}

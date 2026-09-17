@@ -86,11 +86,25 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token') || localStorage.getItem('dinoroar_token')
-  if (to.path.startsWith('/admin') && !token) {
-    next('/login')
-  } else {
-    next()
+  const userStr = localStorage.getItem('dinoroar_user')
+  let isAdmin = false
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      isAdmin = !!user.is_admin
+    } catch {}
   }
+
+  if (to.path.startsWith('/admin')) {
+    if (!token) {
+      return next('/login')
+    }
+    if (userStr && !isAdmin) {
+      window.location.href = '/dashboard'
+      return
+    }
+  }
+  next()
 })
 
 export default router

@@ -1,0 +1,21 @@
+{% extends "admin_base.html" %}
+
+{% block content %}
+<div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #fff; display: flex; align-items: center; gap: 10px;">
+            <span>🏦</span> 蛋能量流水账本
+        </h2>
+        <button onclick="location.reload()" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; padding: 6px 14px; border-radius: 6px; cursor: pointer;">
+            🔄 刷新
+        </button>
+    </div>
+
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; text-align: center; color: #94a3b8;">
+        <p style="font-size: 16px; margin-bottom: 10px;">建议通过 Vue 3 SPA 控制台访问完整银行明细与电子回单功能：</p>
+        <a href="/admin/energy/ledger" style="display: inline-block; background: #3b82f6; color: #fff; padding: 8px 18px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            🚀 打开现代 SPA 账本大屏
+        </a>
+    </div>
+</div>
+{% endblock %}
