@@ -121,6 +121,7 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
             db.flush() # 确保生成 new_log.id 物理主键
 
             # 通过统一能量引擎写入流水事实并更新余额
+            tx_time = new_log.incident_date or client_updated_at or datetime.datetime.now()
             from .energy_service import EnergyEngineService
             EnergyEngineService.apply_transaction(
                 db=db,
@@ -130,6 +131,7 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
                 target_type_id=3,  # LOG
                 target_id=new_log.id, # 严格强类型整型主键
                 request_uuid=f"log_reward_{new_log.uuid}",
+                created_at=tx_time,
                 commit=False
             )
             logger.info(f"Sticker Economy: User {current_user.id} earned {earned_energy} energy for new log {new_log.id} (uuid={log_data.uuid}, media_rewarded={new_log.media_rewarded})")

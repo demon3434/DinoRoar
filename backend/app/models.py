@@ -359,7 +359,7 @@ class CheckInRecord(Base):
     streak_bonus = Column(Integer, nullable=False, default=0)  # 连签加成奖励
     is_crit = Column(Boolean, nullable=False, default=False)  # 是否触发暴击
     streak_days = Column(Integer, nullable=False, default=1)  # 截止当日连续签到天数
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
     user = orm_relationship("User")
 
@@ -401,7 +401,7 @@ class EggEnergyTransaction(Base):
     target_type_id = Column(Integer, ForeignKey("egg_energy_target_types.target_type_id"), nullable=False)
     target_id = Column(Integer, nullable=False)  # 严格强类型整型外键，关联目标业务表的 id
     request_uuid = Column(String(36), unique=True, nullable=False, index=True)  # 幂等唯一键
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
     user = orm_relationship("User")
     event_type = orm_relationship("EggEnergyEventType")

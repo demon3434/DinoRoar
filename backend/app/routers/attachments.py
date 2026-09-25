@@ -37,7 +37,17 @@ def _reward_media_bonus_if_first_attachment(db: Session, log_uuid: Optional[str]
     log = db.query(Log).filter(Log.uuid == log_uuid, Log.user_id == current_user.id).first()
     if log and not getattr(log, "media_rewarded", False):
         log.media_rewarded = True
-        current_user.egg_energy = getattr(current_user, "egg_energy", 0) + 20
+        from ..services.energy_service import EnergyEngineService
+        EnergyEngineService.apply_transaction(
+            db=db,
+            user_id=current_user.id,
+            event_type_id=201, # LOG_REWARD
+            change_amount=20,
+            target_type_id=3,  # LOG
+            target_id=log.id,
+            request_uuid=f"log_media_reward_{log.uuid}",
+            commit=False
+        )
         import logging
         logging.getLogger(__name__).info(f"Sticker Economy: User {current_user.id} rewarded +20 bonus energy for first media attachment on log {log_uuid} (media_rewarded set to True)")
 

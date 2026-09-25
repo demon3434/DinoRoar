@@ -1,4 +1,5 @@
 import logging
+import datetime
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -31,6 +32,7 @@ class EnergyEngineService:
         target_type_id: int,
         target_id: int,
         request_uuid: str,
+        created_at: Optional[datetime.datetime] = None,
         commit: bool = True
     ) -> models.EggEnergyTransaction:
         """
@@ -42,6 +44,7 @@ class EnergyEngineService:
         :param target_type_id: 目标实体类型ID (如 1 商品, 2 签到, 3 日记, 4 奖品)
         :param target_id: 目标业务表的整型自增 ID
         :param request_uuid: 客户端生成的幂等唯一键
+        :param created_at: 可选事务发生时间戳，默认取本地当前时间
         :param commit: 是否在本方法内直接 commit
         """
         # 1. 幂等性校验：如果已有相同 request_uuid 的流水，直接返回该流水（防止网络重试导致重复扣/送）
@@ -73,6 +76,9 @@ class EnergyEngineService:
         if not event_type:
             raise HTTPException(status_code=400, detail=f"未知的能量事件类型ID: {event_type_id}")
 
+        import datetime as dt_module
+        actual_created_at = created_at or dt_module.datetime.now()
+
         # 4. 插入流水事实表
         tx = models.EggEnergyTransaction(
             user_id=user_id,
@@ -81,7 +87,8 @@ class EnergyEngineService:
             balance_after=new_balance,
             target_type_id=target_type_id,
             target_id=target_id,
-            request_uuid=request_uuid
+            request_uuid=request_uuid,
+            created_at=actual_created_at
         )
         db.add(tx)
 
@@ -200,17 +207,19 @@ class EnergyEngineService:
                 subtitle = "✨ 每日签到获得蛋能量"
 
         elif tx.target_type_id == 3:  # LOG
-            title = "手账日记奖励"
+            is_media_reward = bool(tx.request_uuid and tx.request_uuid.startswith("log_media_reward_"))
+            title = "日记配图加成奖励" if is_media_reward else "手账日记奖励"
             type_icon = None
             direction = "EARN"
             theme_color = "#10B981"
-            badge_label = "手账日记"
+            badge_label = "日记配图" if is_media_reward else "手账日记"
             log = db.query(models.Log).filter(models.Log.id == tx.target_id).first()
             if log:
                 dino = db.query(models.DinoConfig).filter(models.DinoConfig.id == log.mood_dino_id).first()
                 dino_name = dino.name if dino else "心情恐龙"
                 diary_title = log.title.strip() if (log.title and log.title.strip()) else f"{log.incident_date.strftime('%Y-%m-%d') if log.incident_date else ''} 手账"
-                subtitle = f"📖 关联日记: 《{diary_title}》 · {dino_name}"
+                prefix_desc = "🖼️ 配图/多媒体加成" if is_media_reward else "📖 关联日记"
+                subtitle = f"{prefix_desc}: 《{diary_title}》 · {dino_name}"
                 if dino and dino.image_url:
                     image_url = dino.image_url if dino.image_url.startswith("/") else f"/static/images/dinosaurs/{dino.image_url}"
                 else:

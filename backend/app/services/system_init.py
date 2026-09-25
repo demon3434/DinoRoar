@@ -365,6 +365,20 @@ def init_system_data(db: Session):
     except Exception as bf_err:
         logger.error(f"Energy Backfill: Error during backfill: {bf_err}")
 
+    # 9. 历史日记多媒体奖励补发流水自愈
+    try:
+        from .energy_repair import repair_missing_media_reward_transactions
+        repair_missing_media_reward_transactions(db)
+    except Exception as er_err:
+        logger.error(f"Energy Repair: Error during repair: {er_err}")
+
+    # 10. 历史流水 UTC 时区时差自愈修复
+    try:
+        from .energy_repair import fix_timezone_of_historical_transactions
+        fix_timezone_of_historical_transactions(db)
+    except Exception as tz_err:
+        logger.error(f"Timezone Repair: Error during timezone fix: {tz_err}")
+
 
 def seed_energy_and_checkin_defaults(db: Session):
     """
