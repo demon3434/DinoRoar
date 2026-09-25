@@ -1,0 +1,12 @@
+.git
+.agents
+.agent
+openspec
+docs
+android
+frontend/node_modules
+frontend/dist
+data
+uploads
+*.zip
+*.log
