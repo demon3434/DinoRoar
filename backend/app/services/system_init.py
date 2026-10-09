@@ -379,6 +379,13 @@ def init_system_data(db: Session):
     except Exception as tz_err:
         logger.error(f"Timezone Repair: Error during timezone fix: {tz_err}")
 
+    # 11. 日记奖励与配图加成流水时序倒挂自愈修复
+    try:
+        from .energy_repair import repair_inverted_log_reward_timestamps
+        repair_inverted_log_reward_timestamps(db)
+    except Exception as inv_err:
+        logger.error(f"Inversion Repair: Error during inversion fix: {inv_err}")
+
 
 def seed_energy_and_checkin_defaults(db: Session):
     """

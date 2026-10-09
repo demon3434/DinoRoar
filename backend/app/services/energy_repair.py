@@ -151,3 +151,46 @@ def fix_timezone_of_historical_transactions(db: Session) -> dict:
         logger.error(f"Timezone Repair: Error during execution: {e}")
 
     return {"fixed_count": fixed_count}
+
+
+def repair_inverted_log_reward_timestamps(db: Session) -> dict:
+    """
+    自愈修复存量中因手机/服务器时钟差导致时间戳倒挂的日记流水对：
+    当同一日记下基础奖励(+10)的创建时间晚于配图加成奖励(+20)时，
+    校正配图加成奖励的时间戳，使其略晚于基础奖励，杜绝流水倒挂与结余交错。
+    """
+    fixed_count = 0
+    try:
+        # 查询所有日记加成流水
+        media_txs = db.query(models.EggEnergyTransaction).filter(
+            models.EggEnergyTransaction.target_type_id == 3,
+            models.EggEnergyTransaction.request_uuid.like("log_media_reward_%")
+        ).all()
+
+        for m_tx in media_txs:
+            log_uuid = m_tx.request_uuid.replace("log_media_reward_", "")
+            base_tx = db.query(models.EggEnergyTransaction).filter(
+                models.EggEnergyTransaction.target_type_id == 3,
+                models.EggEnergyTransaction.target_id == m_tx.target_id,
+                models.EggEnergyTransaction.request_uuid == f"log_reward_{log_uuid}"
+            ).first()
+
+            if base_tx and base_tx.created_at and m_tx.created_at:
+                # 若基础流水时间 >= 加成流水时间，产生倒挂
+                if base_tx.created_at >= m_tx.created_at:
+                    old_time = m_tx.created_at
+                    # 将加成流水时间校正为基础流水时间后 2 秒
+                    m_tx.created_at = base_tx.created_at + datetime.timedelta(seconds=2)
+                    fixed_count += 1
+                    logger.info(
+                        f"Inversion Repair: Fixed inverted media tx={m_tx.id} for log={m_tx.target_id} "
+                        f"from {old_time} to {m_tx.created_at} (base_tx={base_tx.id} at {base_tx.created_at})"
+                    )
+
+        if fixed_count > 0:
+            db.commit()
+            logger.info(f"Inversion Repair: Total {fixed_count} inverted log transaction pairs healed.")
+    except Exception as e:
+        logger.error(f"Inversion Repair: Error during execution: {e}")
+
+    return {"fixed_count": fixed_count}

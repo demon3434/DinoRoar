@@ -120,8 +120,8 @@ def sync_logs_service(db: Session, current_user: User, payload: LogSyncPayload) 
                 
             db.flush() # 确保生成 new_log.id 物理主键
 
-            # 通过统一能量引擎写入流水事实并更新余额
-            tx_time = new_log.incident_date or client_updated_at or datetime.datetime.now()
+            # 通过统一能量引擎写入流水事实并更新余额（统一使用服务器物理入账时间，避免时钟倒挂与结余交错）
+            tx_time = datetime.datetime.now()
             from .energy_service import EnergyEngineService
             EnergyEngineService.apply_transaction(
                 db=db,
