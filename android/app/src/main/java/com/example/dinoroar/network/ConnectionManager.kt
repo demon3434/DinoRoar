@@ -31,8 +31,8 @@ class ConnectionManager @Inject constructor(
     private val TAG = "ConnectionManager"
     
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(3, TimeUnit.SECONDS)
-        .readTimeout(3, TimeUnit.SECONDS)
+        .connectTimeout(1500, TimeUnit.MILLISECONDS)
+        .readTimeout(1500, TimeUnit.MILLISECONDS)
         .build()
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Idle)

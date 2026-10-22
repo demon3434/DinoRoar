@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, Index, UniqueConstraint, desc
 from sqlalchemy.orm import relationship as orm_relationship
 from .database import Base
 
@@ -408,9 +408,34 @@ class EggEnergyTransaction(Base):
     target_type = orm_relationship("EggEnergyTargetType")
 
     __table_args__ = (
+        Index("idx_energy_tx_user_id_desc", "user_id", desc("id")),
         Index("idx_energy_tx_user_created", "user_id", "created_at"),
         Index("idx_energy_tx_target", "target_type_id", "target_id"),
     )
+
+
+class DailySummary(Base):
+    """
+    按日指标预聚合事实表
+    用于极速呈现首页总天数、周/月/年能量统计与热力图，彻底消除全表 COUNT/SUM 扫描
+    """
+    __tablename__ = "daily_summary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    date_str = Column(String(10), nullable=False)  # "YYYY-MM-DD"
+    diary_count = Column(Integer, nullable=False, default=0)
+    energy_gained = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now, nullable=False)
+
+    user = orm_relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "date_str", name="uq_daily_summary_user_date"),
+        Index("idx_daily_summary_user_date", "user_id", "date_str"),
+    )
+
 
 
 

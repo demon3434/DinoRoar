@@ -52,6 +52,9 @@ fun MainTopBar(
     extranetUrl: String,
     syncState: SyncState,
     onSyncClick: () -> Unit,
+    isProbing: Boolean = false,
+    probeMessage: String? = null,
+    onProbeClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val appColors = LocalAppColors.current
@@ -112,14 +115,30 @@ fun MainTopBar(
             }
         },
         actions = {
-            // 网络通道详情下拉
+            // 网络通道详情下拉与即测指示器
             Box {
-                IconButton(onClick = { isNetworkInfoExpanded = true }) {
-                    Icon(
-                        imageVector = netState.icon,
-                        contentDescription = "Network State Indicator",
-                        tint = netState.color
-                    )
+                IconButton(onClick = {
+                    isNetworkInfoExpanded = true
+                    onProbeClick?.invoke()
+                }) {
+                    Box(
+                        modifier = Modifier.size(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isProbing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = appColors.neonGreen
+                            )
+                        } else {
+                            Icon(
+                                imageVector = netState.icon,
+                                contentDescription = "Network State Indicator",
+                                tint = netState.color
+                            )
+                        }
+                    }
                 }
                 DropdownMenu(
                     expanded = isNetworkInfoExpanded,
@@ -128,16 +147,29 @@ fun MainTopBar(
                         .background(appColors.cardBg)
                         .border(1.dp, appColors.neonAmber.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
-                        .width(220.dp)
+                        .width(240.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "📡 同步通道详情",
-                            color = appColors.neonAmber,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "📡 同步通道详情",
+                                color = appColors.neonAmber,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            if (isProbing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = appColors.neonGreen
+                                )
+                            }
+                        }
                         HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                         Text(
                             text = "线路: ${netState.title}",
@@ -146,6 +178,14 @@ fun MainTopBar(
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
+                        if (!probeMessage.isNullOrBlank()) {
+                            Text(
+                                text = "状态: $probeMessage",
+                                color = if (isProbing) appColors.neonAmber else appColors.neonGreen,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                         Text(
                             text = "物理地址: ${currentServerUrl.ifBlank { "未连接" }}",
                             color = appColors.textSecondary,
@@ -165,6 +205,26 @@ fun MainTopBar(
                                 text = "☁️ 已切为外网云端兜底线路",
                                 color = appColors.neonBlue,
                                 fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isProbing) {
+                                    onProbeClick?.invoke()
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (isProbing) "⏳ 正在竞速测线中..." else "⚡ 立即并发竞速测线",
+                                color = if (isProbing) appColors.textSecondary else appColors.neonAmber,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 fontFamily = FontFamily.Monospace
                             )
                         }

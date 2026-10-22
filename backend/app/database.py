@@ -34,6 +34,7 @@ check_and_migrate_db_filepath()
 connect_args = {}
 if settings.database_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
+    connect_args["timeout"] = 15
 
 engine = create_engine(
     settings.database_url,
@@ -41,12 +42,17 @@ engine = create_engine(
     echo=False
 )
 
-# Enforce UTF-8 encoding on every SQLite connection
+# Enforce UTF-8, WAL, NORMAL synchronous, busy_timeout and Foreign Keys on every SQLite connection
 if settings.database_url.startswith("sqlite"):
     @event.listens_for(engine, "connect")
-    def set_sqlite_utf8(dbapi_connection, connection_record):
-        dbapi_connection.execute("PRAGMA encoding='UTF-8'")
-        dbapi_connection.execute("PRAGMA journal_mode=WAL")
+    def set_sqlite_pragmas(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA encoding='UTF-8'")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(
     autocommit=False,

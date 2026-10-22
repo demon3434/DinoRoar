@@ -42,15 +42,12 @@ class MainActivity : ComponentActivity() {
   @Inject lateinit var audioRecorder: AudioRecorder
   @Inject lateinit var mediaCompressor: MediaCompressor
   @Inject lateinit var sessionManager: com.example.dinoroar.network.SessionManager
-
-  private lateinit var connectivityManager: ConnectivityManager
-  private var networkCallback: ConnectivityManager.NetworkCallback? = null
+  @Inject lateinit var networkRouteManager: com.example.dinoroar.network.NetworkRouteManager
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
  
-    connectivityManager = getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    registerNetworkCallback()
+    networkRouteManager.startMonitoring()
 
     enableEdgeToEdge()
     setContent {
@@ -66,6 +63,7 @@ class MainActivity : ComponentActivity() {
           MainNavigation(
             nsdHelper = nsdHelper,
             connectionManager = connectionManager,
+            networkRouteManager = networkRouteManager,
             securePrefs = securePrefs,
             apiService = apiService,
             repository = repository,
@@ -80,57 +78,15 @@ class MainActivity : ComponentActivity() {
     }
   }
 
-  private fun registerNetworkCallback() {
-    val request = NetworkRequest.Builder()
-        .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        .build()
-
-    networkCallback = object : ConnectivityManager.NetworkCallback() {
-      override fun onAvailable(network: Network) {
-        triggerIntranetCheck()
-      }
-    }
-    
-    try {
-      connectivityManager.registerNetworkCallback(request, networkCallback!!)
-    } catch (e: Exception) {
-      android.util.Log.e("MainActivity", "Failed to register network callback: ${e.message}")
-    }
-  }
-
-  private fun triggerIntranetCheck() {
-    val intranetUrl = securePrefs.intranetUrl
-    val extranetUrl = securePrefs.extranetUrl
-    val currentUrl = securePrefs.serverUrl
-
-    if (!intranetUrl.isNullOrBlank() && !extranetUrl.isNullOrBlank() &&
-        currentUrl == extranetUrl && intranetUrl != extranetUrl) {
-      
-      if (connectionManager.isWifiConnected()) {
-        lifecycleScope.launch {
-          val isIntranetAccessible = connectionManager.checkConnectionSilent(intranetUrl)
-          if (isIntranetAccessible) {
-            securePrefs.serverUrl = intranetUrl
-            connectionManager.forceConnection(intranetUrl)
-          }
-        }
-      }
-    }
-  }
-
   override fun onResume() {
     super.onResume()
-    triggerIntranetCheck()
+    lifecycleScope.launch {
+      networkRouteManager.raceAndSwitchRoutes()
+    }
   }
 
   override fun onDestroy() {
     super.onDestroy()
-    networkCallback?.let {
-      try {
-        connectivityManager.unregisterNetworkCallback(it)
-      } catch (e: Exception) {
-        android.util.Log.e("MainActivity", "Failed to unregister network callback: ${e.message}")
-      }
-    }
+    networkRouteManager.stopMonitoring()
   }
 }

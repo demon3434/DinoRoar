@@ -41,6 +41,7 @@ fun MainScreen(
     securePrefs: SecurePrefs,
     apiService: DinoApiService,
     connectionManager: ConnectionManager,
+    networkRouteManager: com.example.dinoroar.network.NetworkRouteManager,
     onNavigateToCreate: (String?) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
@@ -55,6 +56,9 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val appColors = LocalAppColors.current
+
+    val isProbing by networkRouteManager.isProbing.collectAsStateWithLifecycle()
+    val probeMessage by networkRouteManager.probeMessage.collectAsStateWithLifecycle()
 
     // 从 ViewModel 中订阅数据流
     val logs by viewModel.logs.collectAsStateWithLifecycle()
@@ -232,6 +236,13 @@ fun MainScreen(
                     intranetUrl = securePrefs.intranetUrl ?: "",
                     extranetUrl = securePrefs.extranetUrl ?: "",
                     syncState = syncState,
+                    isProbing = isProbing,
+                    probeMessage = probeMessage,
+                    onProbeClick = {
+                        coroutineScope.launch {
+                            networkRouteManager.raceAndSwitchRoutes(isManualTrigger = true)
+                        }
+                    },
                     onSyncClick = {
                         coroutineScope.launch {
                             val result = syncManager.sync(isManual = true)

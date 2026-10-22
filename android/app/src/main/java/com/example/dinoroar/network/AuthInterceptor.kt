@@ -48,14 +48,15 @@ class AuthInterceptor @Inject constructor(
         try {
             response = chain.proceed(request)
         } catch (e: java.io.IOException) {
-            val intranetUrl = securePrefs.intranetUrl
-            val extranetUrl = securePrefs.extranetUrl
-            val currentServerUrl = securePrefs.serverUrl
+            val intranetUrl = securePrefs.intranetUrl?.trim()?.removeSuffix("/") ?: ""
+            val extranetUrl = securePrefs.extranetUrl?.trim()?.removeSuffix("/") ?: ""
+            val currentServerUrl = securePrefs.serverUrl?.trim()?.removeSuffix("/") ?: ""
 
-            if (!intranetUrl.isNullOrBlank() && !extranetUrl.isNullOrBlank() &&
-                currentServerUrl == intranetUrl && intranetUrl != extranetUrl) {
-                
-                Log.w(TAG, "Intranet request failed. Retrying and falling back to extranet URL: $extranetUrl")
+            val isCurrentIntranet = (intranetUrl.isNotBlank() && currentServerUrl == intranetUrl) ||
+                    isPrivateNetwork(currentServerUrl)
+
+            if (isCurrentIntranet && extranetUrl.isNotBlank() && currentServerUrl != extranetUrl) {
+                Log.w(TAG, "Intranet request failed (${e.message}). Retrying and falling back to extranet URL: $extranetUrl")
                 securePrefs.serverUrl = extranetUrl
                 connectionManager.forceConnection(extranetUrl)
 
@@ -158,5 +159,26 @@ class AuthInterceptor @Inject constructor(
             Log.e(TAG, "Error redirecting request to $baseUrl: ${e.message}")
         }
         return request
+    }
+
+    private fun isPrivateNetwork(url: String): Boolean {
+        if (url.isBlank()) return false
+        val host = url.trim()
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .substringBefore("/")
+            .substringBefore(":")
+            .lowercase()
+
+        if (host == "localhost" || host == "127.0.0.1") return true
+        if (host.startsWith("192.168.") || host.startsWith("10.")) return true
+        if (host.startsWith("172.")) {
+            val parts = host.split(".")
+            if (parts.size >= 2) {
+                val second = parts[1].toIntOrNull() ?: 0
+                if (second in 16..31) return true
+            }
+        }
+        return false
     }
 }

@@ -1,6 +1,7 @@
 import logging
 import datetime
 from typing import Dict, Any, List, Optional
+from sqlalchemy import func, case, and_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -205,11 +206,9 @@ class EnergyEngineService:
                 }
             else:
                 subtitle = "✨ 每日签到获得蛋能量"
-
         elif tx.target_type_id == 3:  # LOG
             is_media_reward = bool(tx.request_uuid and tx.request_uuid.startswith("log_media_reward_"))
             title = "日记配图加成奖励" if is_media_reward else "手账日记奖励"
-            type_icon = None
             direction = "EARN"
             theme_color = "#10B981"
             badge_label = "日记配图" if is_media_reward else "手账日记"
@@ -220,11 +219,7 @@ class EnergyEngineService:
                 diary_title = log.title.strip() if (log.title and log.title.strip()) else f"{log.incident_date.strftime('%Y-%m-%d') if log.incident_date else ''} 手账"
                 prefix_desc = "🖼️ 配图/多媒体加成" if is_media_reward else "📖 关联日记"
                 subtitle = f"{prefix_desc}: 《{diary_title}》 · {dino_name}"
-                if dino and dino.image_url:
-                    image_url = dino.image_url if dino.image_url.startswith("/") else f"/static/images/dinosaurs/{dino.image_url}"
-                else:
-                    image_url = None
-
+                image_url = (dino.image_url if dino.image_url.startswith("/") else f"/static/images/dinosaurs/{dino.image_url}") if (dino and dino.image_url) else None
                 detail_info = {
                     "diary_uuid": log.uuid,
                     "mood_id": log.mood_dino_id,
@@ -235,26 +230,18 @@ class EnergyEngineService:
                 }
             else:
                 subtitle = "📖 记录生活手账获得蛋能量"
-
         elif tx.target_type_id == 4:  # PRIZE
             title = "活动神秘宝箱"
-            type_icon = None
             subtitle = f"🎉 获得活动奖励 #{tx.target_id}"
             badge_label = "活动奖品"
-            image_url = None
             theme_color = "#EC4899"
             direction = "EARN"
             detail_info = {"prize_id": tx.target_id}
 
         return {
-            "title": title,
-            "subtitle": subtitle,
-            "badge_label": badge_label,
-            "type_icon": type_icon,
-            "image_url": image_url,
-            "theme_color": theme_color,
-            "direction": direction,
-            "detail_info": detail_info
+            "title": title, "subtitle": subtitle, "badge_label": badge_label,
+            "type_icon": type_icon, "image_url": image_url, "theme_color": theme_color,
+            "direction": direction, "detail_info": detail_info
         }
 
 
@@ -284,68 +271,50 @@ class EnergyEngineService:
         last_day_of_prev_month = first_day_of_current_month - datetime.timedelta(days=1)
         last_month_str = last_day_of_prev_month.strftime("%Y-%m")
 
+        today_start = datetime.datetime.combine(now.date(), datetime.time.min)
+        week_start = datetime.datetime.combine(now.date() - datetime.timedelta(days=now.weekday()), datetime.time.min)
+        month_start = datetime.datetime.combine(now.date().replace(day=1), datetime.time.min)
+
+        if month:
+            try:
+                target_m_start = datetime.datetime.strptime(f"{month}-01", "%Y-%m-%d")
+            except Exception:
+                target_m_start = month_start
+        else:
+            target_m_start = month_start
+        target_m_end = (target_m_start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+
+        last_m_start = datetime.datetime.combine(last_day_of_prev_month.replace(day=1), datetime.time.min)
+        last_m_end = month_start
+        year_start = datetime.datetime.combine(now.date().replace(month=1, day=1), datetime.time.min)
+
         user = db.query(models.User).filter(models.User.id == user_id).first()
         current_balance = user.egg_energy if user else 0
 
-        # 全量统计汇总 (当前用户)
-        all_user_txs = db.query(models.EggEnergyTransaction).filter(
-            models.EggEnergyTransaction.user_id == user_id
-        ).all()
+        # 核心优化：单次高效 SQL 条件聚合，完全杜绝拉取全量流水在 Python 内存中做循环计算
+        stats = db.query(
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= today_start, models.EggEnergyTransaction.change_amount > 0), models.EggEnergyTransaction.change_amount), else_=0)), 0).label("today_income"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= today_start, models.EggEnergyTransaction.change_amount < 0), func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0).label("today_expense"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= week_start, models.EggEnergyTransaction.change_amount > 0), models.EggEnergyTransaction.change_amount), else_=0)), 0).label("week_income"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= week_start, models.EggEnergyTransaction.change_amount < 0), func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0).label("week_expense"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= target_m_start, models.EggEnergyTransaction.created_at < target_m_end, models.EggEnergyTransaction.change_amount > 0), models.EggEnergyTransaction.change_amount), else_=0)), 0).label("month_income"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= target_m_start, models.EggEnergyTransaction.created_at < target_m_end, models.EggEnergyTransaction.change_amount < 0), func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0).label("month_expense"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= last_m_start, models.EggEnergyTransaction.created_at < last_m_end, models.EggEnergyTransaction.change_amount > 0), models.EggEnergyTransaction.change_amount), else_=0)), 0).label("last_month_income"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= last_m_start, models.EggEnergyTransaction.created_at < last_m_end, models.EggEnergyTransaction.change_amount < 0), func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0).label("last_month_expense"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= year_start, models.EggEnergyTransaction.change_amount > 0), models.EggEnergyTransaction.change_amount), else_=0)), 0).label("year_income"),
+            func.coalesce(func.sum(case((and_(models.EggEnergyTransaction.created_at >= year_start, models.EggEnergyTransaction.change_amount < 0), func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0).label("year_expense"),
+        ).filter(models.EggEnergyTransaction.user_id == user_id).first()
 
-        today_income = 0
-        today_expense = 0
-        week_income = 0
-        week_expense = 0
-        month_total_income = 0
-        month_total_expense = 0
-        last_month_income = 0
-        last_month_expense = 0
-        year_income = 0
-        year_expense = 0
-
-        for t in all_user_txs:
-            if not t.created_at:
-                continue
-            c_date = t.created_at.strftime("%Y-%m-%d")
-            c_month = t.created_at.strftime("%Y-%m")
-            c_year = t.created_at.strftime("%Y")
-
-            # 今日统计
-            if c_date == today_str:
-                if t.change_amount > 0:
-                    today_income += t.change_amount
-                else:
-                    today_expense += abs(t.change_amount)
-
-            # 本周统计
-            if c_date >= week_start_date:
-                if t.change_amount > 0:
-                    week_income += t.change_amount
-                else:
-                    week_expense += abs(t.change_amount)
-
-            # 本月/指定月份统计
-            target_month = month if month else current_month_str
-            if c_month == target_month:
-                if t.change_amount > 0:
-                    month_total_income += t.change_amount
-                else:
-                    month_total_expense += abs(t.change_amount)
-
-            # 上月统计
-            if c_month == last_month_str:
-                if t.change_amount > 0:
-                    last_month_income += t.change_amount
-                else:
-                    last_month_expense += abs(t.change_amount)
-
-            # 本年统计
-            if c_year == current_year_str:
-                if t.change_amount > 0:
-                    year_income += t.change_amount
-                else:
-                    year_expense += abs(t.change_amount)
-
+        today_income = int(stats.today_income) if stats else 0
+        today_expense = int(stats.today_expense) if stats else 0
+        week_income = int(stats.week_income) if stats else 0
+        week_expense = int(stats.week_expense) if stats else 0
+        month_total_income = int(stats.month_income) if stats else 0
+        month_total_expense = int(stats.month_expense) if stats else 0
+        last_month_income = int(stats.last_month_income) if stats else 0
+        last_month_expense = int(stats.last_month_expense) if stats else 0
+        year_income = int(stats.year_income) if stats else 0
+        year_expense = int(stats.year_expense) if stats else 0
         month_net = month_total_income - month_total_expense
 
         summary = {
@@ -373,22 +342,40 @@ class EnergyEngineService:
         elif filter_type == "expense":
             query = query.filter(models.EggEnergyTransaction.change_amount < 0)
 
-        # 时间维度过滤
+        # 闭开区间时间范围过滤，精准命中 B-Tree 索引
         if month:
-            # 指定月份优先
-            query = query.filter(models.EggEnergyTransaction.created_at.like(f"{month}%"))
+            query = query.filter(
+                models.EggEnergyTransaction.created_at >= target_m_start,
+                models.EggEnergyTransaction.created_at < target_m_end
+            )
         elif time_range == "today":
-            query = query.filter(models.EggEnergyTransaction.created_at.like(f"{today_str}%"))
+            tomorrow_start = today_start + datetime.timedelta(days=1)
+            query = query.filter(
+                models.EggEnergyTransaction.created_at >= today_start,
+                models.EggEnergyTransaction.created_at < tomorrow_start
+            )
         elif time_range == "week":
-            query = query.filter(models.EggEnergyTransaction.created_at >= f"{week_start_date} 00:00:00")
+            query = query.filter(models.EggEnergyTransaction.created_at >= week_start)
         elif time_range == "month":
-            query = query.filter(models.EggEnergyTransaction.created_at.like(f"{current_month_str}%"))
+            next_m_start = (month_start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+            query = query.filter(
+                models.EggEnergyTransaction.created_at >= month_start,
+                models.EggEnergyTransaction.created_at < next_m_start
+            )
         elif time_range == "last_month":
-            query = query.filter(models.EggEnergyTransaction.created_at.like(f"{last_month_str}%"))
+            query = query.filter(
+                models.EggEnergyTransaction.created_at >= last_m_start,
+                models.EggEnergyTransaction.created_at < last_m_end
+            )
         elif time_range == "year":
-            query = query.filter(models.EggEnergyTransaction.created_at.like(f"{current_year_str}%"))
+            next_year_start = datetime.datetime.combine(now.date().replace(year=now.year + 1, month=1, day=1), datetime.time.min)
+            query = query.filter(
+                models.EggEnergyTransaction.created_at >= year_start,
+                models.EggEnergyTransaction.created_at < next_year_start
+            )
 
-        query = query.order_by(models.EggEnergyTransaction.created_at.desc(), models.EggEnergyTransaction.id.desc())
+        # 直接按照单调自增主键倒序排序，精准走 (user_id, id DESC) 覆盖索引，彻底消除 Filesort
+        query = query.order_by(models.EggEnergyTransaction.id.desc())
 
         total = query.count()
         offset = (page - 1) * page_size
@@ -457,16 +444,18 @@ class EnergyEngineService:
         if end_date:
             query = query.filter(models.EggEnergyTransaction.created_at <= f"{end_date} 23:59:59")
 
-        # 统计汇总
-        all_filtered = query.all()
-        total_granted = sum(t.change_amount for t in all_filtered if t.change_amount > 0)
-        total_consumed = sum(abs(t.change_amount) for t in all_filtered if t.change_amount < 0)
+        # 统计汇总：通过 SQL 单次条件聚合直接计算，杜绝 query.all()
+        agg = query.with_entities(
+            func.coalesce(func.sum(case((models.EggEnergyTransaction.change_amount > 0, models.EggEnergyTransaction.change_amount), else_=0)), 0),
+            func.coalesce(func.sum(case((models.EggEnergyTransaction.change_amount < 0, func.abs(models.EggEnergyTransaction.change_amount)), else_=0)), 0)
+        ).first()
+        total_granted = int(agg[0]) if agg else 0
+        total_consumed = int(agg[1]) if agg else 0
         net_circulation = total_granted - total_consumed
 
         total = query.count()
         offset = (page - 1) * page_size
         records = query.order_by(
-            models.EggEnergyTransaction.created_at.desc(),
             models.EggEnergyTransaction.id.desc()
         ).offset(offset).limit(page_size).all()
 
@@ -517,5 +506,3 @@ class EnergyEngineService:
             "net_circulation": net_circulation,
             "items": items
         }
-
-

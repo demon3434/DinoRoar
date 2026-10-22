@@ -129,7 +129,7 @@ class LogBase(BaseModel):
     title: Optional[str] = None
     incident_date: datetime.datetime
     mood_dino_id: int
-    content: str
+    content: Optional[str] = ""
     own_thoughts: Optional[str] = None
     updated_at: Optional[datetime.datetime] = None
     version: int = 1

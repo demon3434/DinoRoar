@@ -2,7 +2,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, and_, desc
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, defer
 from ..database import get_db
 from ..models import Log, Attachment, User, Person
 from ..schemas import LogSyncPayload, LogResponse, PaginatedLogResponse
@@ -66,8 +66,22 @@ async def list_logs(
         db_query = db_query.filter(Log.mood_dino_id == mood_dino_id)
 
     if incident_date:
-        # Match year-month or full date string in database
-        db_query = db_query.filter(Log.incident_date.like(f"%{incident_date}%"))
+        # Match year-month or full date string using closed-open interval to utilize index
+        try:
+            import datetime as _dt
+            parts = incident_date.strip().split("-")
+            if len(parts) == 2:
+                s_date = _dt.datetime.strptime(incident_date.strip(), "%Y-%m")
+                e_date = (s_date.replace(day=28) + _dt.timedelta(days=4)).replace(day=1)
+                db_query = db_query.filter(Log.incident_date >= s_date, Log.incident_date < e_date)
+            elif len(parts) == 3:
+                s_date = _dt.datetime.strptime(incident_date.strip(), "%Y-%m-%d")
+                e_date = s_date + _dt.timedelta(days=1)
+                db_query = db_query.filter(Log.incident_date >= s_date, Log.incident_date < e_date)
+            else:
+                db_query = db_query.filter(Log.incident_date.like(f"%{incident_date}%"))
+        except Exception:
+            db_query = db_query.filter(Log.incident_date.like(f"%{incident_date}%"))
 
     if start_date:
         # incident_date string is stored as "2026-07-12T16:00:00"
@@ -86,7 +100,12 @@ async def list_logs(
     items = db_query.order_by(desc(Log.incident_date))\
         .offset(offset)\
         .limit(limit)\
-        .options(selectinload(Log.attachments), selectinload(Log.persons))\
+        .options(
+            defer(Log.content),
+            defer(Log.own_thoughts),
+            selectinload(Log.attachments),
+            selectinload(Log.persons)
+        )\
         .all()
 
     from ..services.log_service import populate_log_canvas_details

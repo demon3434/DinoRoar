@@ -26,9 +26,13 @@ def get_logs_stats_overview_service(db: Session, current_user: User) -> dict:
         Log.is_deleted == False
     ).order_by(desc(Log.incident_date)).all()
 
-    # 2. 获取包含多媒体附件的日志 ID
+    # 2. 获取包含多媒体附件的日志 ID（约束在当前用户有效日记范围内，杜绝整库全表扫描）
     media_log_ids = set(
-        r[0] for r in db.query(Attachment.log_id).filter(
+        r[0] for r in db.query(Attachment.log_id)
+        .join(Log, Attachment.log_id == Log.id)
+        .filter(
+            Log.user_id == current_user.id,
+            Log.is_deleted == False,
             Attachment.log_id.isnot(None),
             or_(
                 Attachment.mime_type.like("image/%"),

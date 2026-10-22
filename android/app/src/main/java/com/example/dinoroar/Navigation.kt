@@ -67,6 +67,7 @@ object PersonSelectorState {
 fun MainNavigation(
     nsdHelper: NsdHelper,
     connectionManager: ConnectionManager,
+    networkRouteManager: com.example.dinoroar.network.NetworkRouteManager,
     securePrefs: SecurePrefs,
     apiService: DinoApiService,
     repository: DataRepository,
@@ -280,6 +281,7 @@ fun MainNavigation(
                     securePrefs = securePrefs,
                     apiService = apiService,
                     connectionManager = connectionManager,
+                    networkRouteManager = networkRouteManager,
                     onNavigateToCreate = { editUuid ->
                         backStack.add(LogCreate(editingLogUuid = editUuid))
                     },
